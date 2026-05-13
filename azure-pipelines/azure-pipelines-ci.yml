@@ -59,6 +59,7 @@ stages:
             inputs:
               containerregistrytype: 'Container Registry'
               dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose.yml'
+              projectName: 'aks-store-demo'
               action: 'Run services'
               buildImages: true
 
