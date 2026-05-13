@@ -53,12 +53,12 @@ stages:
           - checkout: self
             displayName: 'Checkout solution repository'
 
-          # Start services using docker-compose for testing
+          # Start services using docker-compose-quickstart.yml for testing
           - task: DockerCompose@0
             displayName: 'Build and start services for testing'
             inputs:
               containerregistrytype: 'Container Registry'
-              dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose.yml'
+              dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose-quickstart.yml'
               projectName: 'aks-store-demo'
               action: 'Run services'
               buildImages: true
@@ -81,7 +81,8 @@ stages:
             displayName: 'Stop services'
             inputs:
               containerregistrytype: 'Container Registry'
-              dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose.yml'
+              dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose-quickstart.yml'
+              projectName: 'aks-store-demo'
               action: 'Run a Docker Compose command'
               dockerComposeCommand: 'down'
 
