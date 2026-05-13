@@ -53,9 +53,6 @@ stages:
           - checkout: self
             displayName: 'Checkout solution repository'
 
-          # ===========================================
-          # BUILD: Build all Docker images
-          # ===========================================
           - task: Docker@2
             displayName: Build store-front image
             inputs:
@@ -86,9 +83,6 @@ stages:
                 $(imageTag)
                 latest
 
-          # ===========================================
-          # TEST: Run services and health checks
-          # ===========================================
           - task: DockerCompose@0
             displayName: 'Start services for testing'
             inputs:
@@ -119,48 +113,34 @@ stages:
               action: 'Run a Docker Compose command'
               dockerComposeCommand: 'down'
 
-          # ===========================================
-          # PUSH: Push images to ACR
-          # ===========================================
+          - script: |
+              echo "Tagging images for ACR..."
+              docker tag store-front:$(imageTag) $(containerRegistry)/store-front:$(imageTag)
+              docker tag store-front:latest $(containerRegistry)/store-front:latest
+              docker tag order-service:$(imageTag) $(containerRegistry)/order-service:$(imageTag)
+              docker tag order-service:latest $(containerRegistry)/order-service:latest
+              docker tag product-service:$(imageTag) $(containerRegistry)/product-service:$(imageTag)
+              docker tag product-service:latest $(containerRegistry)/product-service:latest
+              echo "Images tagged successfully!"
+            displayName: 'Tag images for ACR'
+
           - task: Docker@2
             displayName: Login to ACR
             inputs:
               command: login
               containerRegistry: $(acrConnection)
 
-          - task: Docker@2
-            displayName: Push store-front image
-            inputs:
-              command: 'push'
-              containerRegistry: $(acrConnection)
-              repository: 'store-front'
-              tags: |
-                $(imageTag)
-                latest
+          - script: |
+              echo "Pushing images to ACR..."
+              docker push $(containerRegistry)/store-front:$(imageTag)
+              docker push $(containerRegistry)/store-front:latest
+              docker push $(containerRegistry)/order-service:$(imageTag)
+              docker push $(containerRegistry)/order-service:latest
+              docker push $(containerRegistry)/product-service:$(imageTag)
+              docker push $(containerRegistry)/product-service:latest
+              echo "Images pushed successfully!"
+            displayName: 'Push images to ACR'
 
-          - task: Docker@2
-            displayName: Push order-service image
-            inputs:
-              command: 'push'
-              containerRegistry: $(acrConnection)
-              repository: 'order-service'
-              tags: |
-                $(imageTag)
-                latest
-
-          - task: Docker@2
-            displayName: Push product-service image
-            inputs:
-              command: 'push'
-              containerRegistry: $(acrConnection)
-              repository: 'product-service'
-              tags: |
-                $(imageTag)
-                latest
-
-          # ===========================================
-          # PUBLISH: Publish Helm chart
-          # ===========================================
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Helm Chart'
             inputs:
