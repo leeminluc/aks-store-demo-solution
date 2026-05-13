@@ -1,0 +1,20 @@
+{{- if .Values.storeFront.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-front
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aks-store-demo.labels" . | nindent 4 }}
+    app: store-front
+spec:
+  type: {{ .Values.storeFront.service.type }}
+  ports:
+    - port: {{ .Values.storeFront.service.port }}
+      targetPort: {{ .Values.storeFront.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "aks-store-demo.selectorLabels" . | nindent 4 }}
+    app: store-front
+{{- end }}

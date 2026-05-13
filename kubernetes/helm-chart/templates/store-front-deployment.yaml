@@ -1,0 +1,46 @@
+{{- if .Values.storeFront.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-front
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aks-store-demo.labels" . | nindent 4 }}
+    app: store-front
+spec:
+  replicas: {{ .Values.storeFront.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aks-store-demo.selectorLabels" . | nindent 6 }}
+      app: store-front
+  template:
+    metadata:
+      labels:
+        {{- include "aks-store-demo.selectorLabels" . | nindent 8 }}
+        app: store-front
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: store-front
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.storeFront.image.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.storeFront.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.storeFront.service.targetPort }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.storeFront.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.storeFront.resources | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.storeFront.probes.startup | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.storeFront.probes.readiness | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.storeFront.probes.liveness | nindent 12 }}
+      nodeSelector:
+        "kubernetes.io/os": linux
+{{- end }}

@@ -1,0 +1,215 @@
+# =============================================================================
+# AKS Store Demo - CI Pipeline (Azure DevOps)
+# This pipeline builds, tests, and pushes Docker images to Azure Container Registry
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - README.md
+      - docs/
+
+pr:
+  branches:
+    include:
+      - main
+
+variables:
+  - group: aks-store-demo-variables
+  - name: imageTag
+    value: '$(Build.BuildId)'
+  - name: dockerRegistryServiceConnection
+    value: 'acr-connection'
+  - name: containerRegistry
+    value: '$(containerRegistryName).azurecr.io'
+  - name: vmImageName
+    value: 'ubuntu-latest'
+
+stages:
+  # ---------------------------------------------------------------------------
+  # Build Stage
+  # ---------------------------------------------------------------------------
+  - stage: Build
+    displayName: Build Stage
+    jobs:
+      - job: Build
+        displayName: Build Services
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: Docker@2
+            displayName: Build store-front image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'store-front'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/src/store-front/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)/src/store-front'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Build store-admin image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'store-admin'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/src/store-admin/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)/src/store-admin'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Build order-service image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'order-service'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/src/order-service/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)/src/order-service'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Build product-service image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'product-service'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/src/product-service/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)/src/product-service'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Build makeline-service image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'makeline-service'
+              command: 'build'
+              Dockerfile: '$(Build.SourcesDirectory)/src/makeline-service/Dockerfile'
+              buildContext: '$(Build.SourcesDirectory)/src/makeline-service'
+              tags: |
+                $(imageTag)
+                latest
+
+  # ---------------------------------------------------------------------------
+  # Test Stage
+  # ---------------------------------------------------------------------------
+  - stage: Test
+    displayName: Test Stage
+    dependsOn: Build
+    jobs:
+      - job: Test
+        displayName: Run Tests
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: NodeTool@0
+            displayName: 'Install Node.js'
+            inputs:
+              versionSpec: '18.x'
+
+          - script: |
+              cd src/order-service
+              npm install
+              npm test
+            displayName: 'Run order-service tests'
+            continueOnError: true
+
+          - script: |
+              cd src/store-front
+              npm install
+              npm run test:unit
+            displayName: 'Run store-front tests'
+            continueOnError: true
+
+          - script: |
+              cd src/store-admin
+              npm install
+              npm run test:unit
+            displayName: 'Run store-admin tests'
+            continueOnError: true
+
+  # ---------------------------------------------------------------------------
+  # Push Stage
+  # ---------------------------------------------------------------------------
+  - stage: Push
+    displayName: Push to ACR
+    dependsOn: Test
+    condition: succeeded()
+    jobs:
+      - job: Push
+        displayName: Push Images
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: Docker@2
+            displayName: Login to ACR
+            inputs:
+              command: login
+              containerRegistry: $(dockerRegistryServiceConnection)
+
+          - task: Docker@2
+            displayName: Push store-front image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'store-front'
+              command: 'push'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Push store-admin image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'store-admin'
+              command: 'push'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Push order-service image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'order-service'
+              command: 'push'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Push product-service image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'product-service'
+              command: 'push'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: Docker@2
+            displayName: Push makeline-service image
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: 'makeline-service'
+              command: 'push'
+              tags: |
+                $(imageTag)
+                latest
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Kubernetes Manifests'
+            inputs:
+              PathtoPublish: 'kubernetes/manifests'
+              ArtifactName: 'kubernetes-manifests'
+              publishLocation: 'Container'

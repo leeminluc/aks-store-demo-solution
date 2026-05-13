@@ -1,0 +1,45 @@
+# =============================================================================
+# AKS Store Demo Helm Chart
+# =============================================================================
+apiVersion: v2
+name: aks-store-demo
+description: A Helm chart for deploying the AKS Store Demo application with resource limits and network policies
+
+# Chart type
+type: application
+
+# Chart version - increment for chart changes
+version: 1.0.0
+
+# Application version
+appVersion: "2.0.0"
+
+# Chart metadata
+home: https://github.com/Azure-Samples/aks-store-demo
+sources:
+  - https://github.com/Azure-Samples/aks-store-demo
+maintainers:
+  - name: DevOps Team
+    email: devops@example.com
+
+# Keywords for search
+keywords:
+  - azure
+  - aks
+  - kubernetes
+  - microservices
+  - store-demo
+
+# Dependencies (optional)
+dependencies:
+  - name: rabbitmq
+    version: "12.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: rabbitmq.enabled
+    alias: rabbitmq
+
+  - name: mongodb
+    version: "14.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: mongodb.enabled
+    alias: mongodb
