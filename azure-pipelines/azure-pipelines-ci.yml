@@ -14,6 +14,13 @@ pr:
     include:
       - main
 
+resources:
+  repositories:
+    - repository: aks-store-demo
+      type: github
+      name: 'Azure-Samples/aks-store-demo'
+      endpoint: 'github-connection'
+
 variables:
   - group: aks-store-demo-variables
   - name: imageTag
@@ -24,6 +31,8 @@ variables:
     value: '$(containerRegistryName).azurecr.io'
   - name: vmImageName
     value: 'ubuntu-latest'
+  - name: srcPath
+    value: '$(Build.SourcesDirectory)/aks-store-demo/src'
 
 stages:
   # Build Stage
@@ -35,6 +44,14 @@ stages:
         pool:
           vmImage: $(vmImageName)
         steps:
+          # Checkout the source code repository
+          - checkout: aks-store-demo
+            displayName: 'Checkout aks-store-demo source code'
+
+          # Checkout self for kubernetes manifests
+          - checkout: self
+            displayName: 'Checkout solution repository'
+
           - task: Docker@2
             displayName: Login to ACR
             inputs:
@@ -47,8 +64,8 @@ stages:
               containerRegistry: $(acrConnection)
               repository: 'store-front'
               command: 'buildAndPush'
-              Dockerfile: '$(Build.SourcesDirectory)/src/store-front/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)/src/store-front'
+              Dockerfile: '$(srcPath)/store-front/Dockerfile'
+              buildContext: '$(srcPath)/store-front'
               tags: |
                 $(imageTag)
                 latest
@@ -59,8 +76,8 @@ stages:
               containerRegistry: $(acrConnection)
               repository: 'store-admin'
               command: 'buildAndPush'
-              Dockerfile: '$(Build.SourcesDirectory)/src/store-admin/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)/src/store-admin'
+              Dockerfile: '$(srcPath)/store-admin/Dockerfile'
+              buildContext: '$(srcPath)/store-admin'
               tags: |
                 $(imageTag)
                 latest
@@ -71,8 +88,8 @@ stages:
               containerRegistry: $(acrConnection)
               repository: 'order-service'
               command: 'buildAndPush'
-              Dockerfile: '$(Build.SourcesDirectory)/src/order-service/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)/src/order-service'
+              Dockerfile: '$(srcPath)/order-service/Dockerfile'
+              buildContext: '$(srcPath)/order-service'
               tags: |
                 $(imageTag)
                 latest
@@ -83,8 +100,8 @@ stages:
               containerRegistry: $(acrConnection)
               repository: 'product-service'
               command: 'buildAndPush'
-              Dockerfile: '$(Build.SourcesDirectory)/src/product-service/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)/src/product-service'
+              Dockerfile: '$(srcPath)/product-service/Dockerfile'
+              buildContext: '$(srcPath)/product-service'
               tags: |
                 $(imageTag)
                 latest
@@ -95,8 +112,8 @@ stages:
               containerRegistry: $(acrConnection)
               repository: 'makeline-service'
               command: 'buildAndPush'
-              Dockerfile: '$(Build.SourcesDirectory)/src/makeline-service/Dockerfile'
-              buildContext: '$(Build.SourcesDirectory)/src/makeline-service'
+              Dockerfile: '$(srcPath)/makeline-service/Dockerfile'
+              buildContext: '$(srcPath)/makeline-service'
               tags: |
                 $(imageTag)
                 latest
