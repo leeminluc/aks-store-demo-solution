@@ -1,13 +1,7 @@
-# =============================================================================
-# Docker Compose for Local Development
-# Run all services locally without Kubernetes
-# =============================================================================
 version: '3.8'
 
 services:
-  # ---------------------------------------------------------------------------
   # Frontend Services
-  # ---------------------------------------------------------------------------
   store-front:
     image: ghcr.io/azure-samples/aks-store-demo/store-front:2.0.0
     ports:
@@ -21,22 +15,7 @@ services:
     networks:
       - store-network
 
-  store-admin:
-    image: ghcr.io/azure-samples/aks-store-demo/store-admin:2.0.0
-    ports:
-      - "8081:8081"
-    environment:
-      - MAKELINE_SERVICE_URL=http://makeline-service:3001/
-      - ORDER_SERVICE_URL=http://order-service:3000/
-    depends_on:
-      - makeline-service
-      - order-service
-    networks:
-      - store-network
-
-  # ---------------------------------------------------------------------------
   # Backend Services
-  # ---------------------------------------------------------------------------
   order-service:
     image: ghcr.io/azure-samples/aks-store-demo/order-service:2.0.0
     ports:
@@ -57,44 +36,10 @@ services:
     image: ghcr.io/azure-samples/aks-store-demo/product-service:2.0.0
     ports:
       - "3002:3002"
-    environment:
-      - AI_SERVICE_URL=http://ai-service:5001/
     networks:
       - store-network
 
-  makeline-service:
-    image: ghcr.io/azure-samples/aks-store-demo/makeline-service:2.0.0
-    ports:
-      - "3001:3001"
-    environment:
-      - ORDER_QUEUE_URI=amqp://rabbitmq:5672
-      - ORDER_QUEUE_USERNAME=username
-      - ORDER_QUEUE_PASSWORD=password
-      - ORDER_QUEUE_NAME=orders
-      - ORDER_DB_URI=mongodb://mongodb:27017
-      - ORDER_DB_NAME=orderdb
-      - ORDER_DB_COLLECTION_NAME=orders
-    depends_on:
-      - rabbitmq
-      - mongodb
-    networks:
-      - store-network
-
-  # ---------------------------------------------------------------------------
-  # AI Service (Optional)
-  # ---------------------------------------------------------------------------
-  ai-service:
-    image: ghcr.io/azure-samples/aks-store-demo/ai-service:2.0.0
-    ports:
-      - "5001:5001"
-    environment:
-      - OPENAI_HOST=dummy
-    networks:
-      - store-network
-
-  # ---------------------------------------------------------------------------
   # Message Queue
-  # ---------------------------------------------------------------------------
   rabbitmq:
     image: mcr.microsoft.com/azurelinux/base/rabbitmq-server:3.13
     ports:
@@ -108,55 +53,11 @@ services:
     networks:
       - store-network
 
-  # ---------------------------------------------------------------------------
-  # Database
-  # ---------------------------------------------------------------------------
-  mongodb:
-    image: mongo:7.0
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - store-network
-
-  # ---------------------------------------------------------------------------
-  # Load Generators (Optional)
-  # ---------------------------------------------------------------------------
-  virtual-customer:
-    image: ghcr.io/azure-samples/aks-store-demo/virtual-customer:2.0.0
-    environment:
-      - ORDER_SERVICE_URL=http://order-service:3000/
-      - ORDERS_PER_HOUR=20
-    depends_on:
-      - order-service
-    networks:
-      - store-network
-    profiles:
-      - load-gen
-
-  virtual-worker:
-    image: ghcr.io/azure-samples/aks-store-demo/virtual-worker:2.0.0
-    environment:
-      - MAKELINE_SERVICE_URL=http://makeline-service:3001/
-      - ORDERS_PER_HOUR=10
-    depends_on:
-      - makeline-service
-    networks:
-      - store-network
-    profiles:
-      - load-gen
-
-# -----------------------------------------------------------------------------
 # Networks
-# -----------------------------------------------------------------------------
 networks:
   store-network:
     driver: bridge
 
-# -----------------------------------------------------------------------------
 # Volumes
-# -----------------------------------------------------------------------------
 volumes:
   rabbitmq_data:
-  mongodb_data:

@@ -1,7 +1,4 @@
-# =============================================================================
-# AKS Store Demo - CD Pipeline (Azure DevOps)
-# This pipeline deploys the application to AKS after CI pipeline completes
-# =============================================================================
+# AKS Store Demo - CD Pipeline
 
 trigger:
   none
@@ -12,14 +9,14 @@ resources:
       source: 'aks-store-demo-ci'
       trigger:
         stages:
-          - Push
+          - Build
 
 variables:
   - group: aks-store-demo-variables
   - name: imageTag
     value: '$(resources.pipeline.ci-pipeline.runID)'
-  - name: kubernetesServiceConnection
-    value: 'aks-connection'
+  - name: azureSubscription
+    value: 'azure-connection'
   - name: kubernetesNamespace
     value: 'store-demo'
   - name: vmImageName
@@ -27,14 +24,14 @@ variables:
 
 stages:
   # ---------------------------------------------------------------------------
-  # Deploy to Dev
+  # Deploy to AKS
   # ---------------------------------------------------------------------------
-  - stage: Deploy_Dev
-    displayName: Deploy to Development
+  - stage: Deploy
+    displayName: Deploy to AKS
     jobs:
       - deployment: Deploy
         displayName: Deploy to AKS
-        environment: 'development'
+        environment: 'aks-store-demo'
         pool:
           vmImage: $(vmImageName)
         strategy:
@@ -49,8 +46,10 @@ stages:
                   displayName: Create namespace if not exists
                   inputs:
                     action: 'deploy'
-                    connectionType: 'kubernetesServiceConnection'
-                    kubernetesServiceConnection: $(kubernetesServiceConnection)
+                    connectionType: 'azureResourceManager'
+                    azureSubscriptionConnection: $(azureSubscription)
+                    azureResourceGroup: $(resourceGroup)
+                    kubernetesCluster: $(aksCluster)
                     namespace: 'default'
                     manifests: |
                       $(Pipeline.Workspace)/kubernetes-manifests/namespace.yaml
@@ -59,8 +58,10 @@ stages:
                   displayName: Deploy application
                   inputs:
                     action: 'deploy'
-                    connectionType: 'kubernetesServiceConnection'
-                    kubernetesServiceConnection: $(kubernetesServiceConnection)
+                    connectionType: 'azureResourceManager'
+                    azureSubscriptionConnection: $(azureSubscription)
+                    azureResourceGroup: $(resourceGroup)
+                    kubernetesCluster: $(aksCluster)
                     namespace: $(kubernetesNamespace)
                     manifests: |
                       $(Pipeline.Workspace)/kubernetes-manifests/ingress.yaml
@@ -71,108 +72,29 @@ stages:
                       $(containerRegistry)/product-service:$(imageTag)
                       $(containerRegistry)/makeline-service:$(imageTag)
 
-  # ---------------------------------------------------------------------------
   # Verify Deployment
-  # ---------------------------------------------------------------------------
-  - stage: Verify_Deployment
-    displayName: Verify Deployment Health
-    dependsOn: Deploy_Dev
+  - stage: Verify
+    displayName: Verify Deployment
+    dependsOn: Deploy
     jobs:
       - job: Verify
-        displayName: Verify Pods are Running
+        displayName: Verify Deployment Health
         pool:
           vmImage: $(vmImageName)
         steps:
           - task: Kubernetes@1
             displayName: Check deployment status
             inputs:
-              connectionType: 'Kubernetes Service Connection'
-              kubernetesServiceEndpoint: $(kubernetesServiceConnection)
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionEndpoint: $(azureSubscription)
+              azureResourceGroup: $(resourceGroup)
+              kubernetesCluster: $(aksCluster)
               command: 'get'
-              arguments: 'pods -n $(kubernetesNamespace) -l app=store-front'
+              arguments: 'pods -n $(kubernetesNamespace)'
               outputFormat: 'jsonpath={.items[*].status.phase}'
 
           - script: |
-              echo "Waiting for pods to be ready..."
-              kubectl wait --for=condition=ready pod -l app=store-front -n $(kubernetesNamespace) --timeout=300s
-              kubectl wait --for=condition=ready pod -l app=order-service -n $(kubernetesNamespace) --timeout=300s
-              kubectl wait --for=condition=ready pod -l app=product-service -n $(kubernetesNamespace) --timeout=300s
-            displayName: 'Wait for pods to be ready'
-
-          - script: |
-              echo "Checking service health endpoints..."
-              kubectl get pods -n $(kubernetesNamespace)
-              kubectl get services -n $(kubernetesNamespace)
-              kubectl get ingress -n $(kubernetesNamespace)
-            displayName: 'Display deployment status'
-
-  # ---------------------------------------------------------------------------
-  # Deploy to Production (with approval)
-  # ---------------------------------------------------------------------------
-  - stage: Deploy_Prod
-    displayName: Deploy to Production
-    dependsOn: Verify_Deployment
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    jobs:
-      - deployment: Deploy
-        displayName: Deploy to Production AKS
-        environment: 'production'
-        pool:
-          vmImage: $(vmImageName)
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: ci-pipeline
-                  artifact: kubernetes-manifests
-
-                - task: KubernetesManifest@1
-                  displayName: Deploy to production namespace
-                  inputs:
-                    action: 'deploy'
-                    connectionType: 'kubernetesServiceConnection'
-                    kubernetesServiceConnection: $(kubernetesServiceConnection)
-                    namespace: 'production'
-                    manifests: |
-                      $(Pipeline.Workspace)/kubernetes-manifests/ingress.yaml
-                    containers: |
-                      $(containerRegistry)/store-front:$(imageTag)
-                      $(containerRegistry)/store-admin:$(imageTag)
-                      $(containerRegistry)/order-service:$(imageTag)
-                      $(containerRegistry)/product-service:$(imageTag)
-                      $(containerRegistry)/makeline-service:$(imageTag)
-
-  # ---------------------------------------------------------------------------
-  # Post-Deployment Notification
-  # ---------------------------------------------------------------------------
-  - stage: Notify
-    displayName: Send Notification
-    dependsOn: 
-      - Deploy_Dev
-      - Verify_Deployment
-    condition: always()
-    jobs:
-      - job: Notify
-        displayName: Send Deployment Notification
-        pool:
-          vmImage: $(vmImageName)
-        steps:
-          - script: |
               echo "Deployment completed!"
-              echo "Environment: Development"
               echo "Image Tag: $(imageTag)"
               echo "Namespace: $(kubernetesNamespace)"
             displayName: 'Print deployment summary'
-
-          - task: SendEmail@1
-            displayName: 'Send email notification'
-            condition: always()
-            inputs:
-              To: 'team@example.com'
-              Subject: 'AKS Store Demo Deployment - $(Build.BuildNumber)'
-              Body: |
-                Deployment Status: $(Agent.JobStatus)
-                Environment: Development
-                Image Tag: $(imageTag)
-                Build Number: $(Build.BuildNumber)
-                Build URL: $(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)
