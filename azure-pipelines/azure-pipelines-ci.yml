@@ -5,14 +5,18 @@ trigger:
     include:
       - main
   paths:
-    exclude:
-      - README.md
-      - docs/
+    include:
+      - azure-pipelines/azure-pipelines-ci.yml
+      - kubernetes/helm-chart/
 
 pr:
   branches:
     include:
       - main
+  paths:
+    include:
+      - azure-pipelines/azure-pipelines-ci.yml
+      - kubernetes/helm-chart/
 
 resources:
   repositories:
@@ -35,29 +39,74 @@ variables:
     value: '$(Build.SourcesDirectory)/aks-store-demo/src'
 
 stages:
-  # Build Stage
-  - stage: Build
-    displayName: Build Stage
+  - stage: Test
+    displayName: Test Stage
     jobs:
-      - job: Build
-        displayName: Build Services
+      - job: Test
+        displayName: Build and Test Application
         pool:
           vmImage: $(vmImageName)
         steps:
-          # Checkout the source code repository
           - checkout: aks-store-demo
             displayName: 'Checkout aks-store-demo source code'
 
-          # Checkout self for kubernetes manifests
           - checkout: self
             displayName: 'Checkout solution repository'
 
+          # Start services using docker-compose for testing
+          - task: DockerCompose@0
+            displayName: 'Build and start services for testing'
+            inputs:
+              containerregistrytype: 'Container Registry'
+              dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose.yml'
+              action: 'Run services'
+              buildImages: true
+
+          # Run health check tests
+          - script: |
+              echo "Waiting for services to be ready..."
+              sleep 30
+              echo "Testing store-front..."
+              curl -f http://localhost:8080/health || exit 1
+              echo "Testing order-service..."
+              curl -f http://localhost:3000/health || exit 1
+              echo "Testing product-service..."
+              curl -f http://localhost:3002/health || exit 1
+              echo "All tests passed!"
+            displayName: 'Run health check tests'
+
+          # Stop services
+          - task: DockerCompose@0
+            displayName: 'Stop services'
+            inputs:
+              containerregistrytype: 'Container Registry'
+              dockerComposeFile: '$(Build.SourcesDirectory)/aks-store-demo/docker-compose.yml'
+              action: 'Run a Docker Compose command'
+              dockerComposeCommand: 'down'
+
+  - stage: Push
+    displayName: Push Stage
+    dependsOn: Test
+    jobs:
+      - job: Push
+        displayName: Build and Push Images to ACR
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - checkout: aks-store-demo
+            displayName: 'Checkout aks-store-demo source code'
+
+          - checkout: self
+            displayName: 'Checkout solution repository'
+
+          # Login to ACR
           - task: Docker@2
             displayName: Login to ACR
             inputs:
               command: login
               containerRegistry: $(acrConnection)
 
+          # Build and push store-front
           - task: Docker@2
             displayName: Build and push store-front image
             inputs:
@@ -70,18 +119,7 @@ stages:
                 $(imageTag)
                 latest
 
-          - task: Docker@2
-            displayName: Build and push store-admin image
-            inputs:
-              containerRegistry: $(acrConnection)
-              repository: 'store-admin'
-              command: 'buildAndPush'
-              Dockerfile: '$(srcPath)/store-admin/Dockerfile'
-              buildContext: '$(srcPath)/store-admin'
-              tags: |
-                $(imageTag)
-                latest
-
+          # Build and push order-service
           - task: Docker@2
             displayName: Build and push order-service image
             inputs:
@@ -94,6 +132,7 @@ stages:
                 $(imageTag)
                 latest
 
+          # Build and push product-service
           - task: Docker@2
             displayName: Build and push product-service image
             inputs:
@@ -106,21 +145,10 @@ stages:
                 $(imageTag)
                 latest
 
-          - task: Docker@2
-            displayName: Build and push makeline-service image
-            inputs:
-              containerRegistry: $(acrConnection)
-              repository: 'makeline-service'
-              command: 'buildAndPush'
-              Dockerfile: '$(srcPath)/makeline-service/Dockerfile'
-              buildContext: '$(srcPath)/makeline-service'
-              tags: |
-                $(imageTag)
-                latest
-
+          # Publish Helm chart
           - task: PublishBuildArtifacts@1
-            displayName: 'Publish Kubernetes Manifests'
+            displayName: 'Publish Helm Chart'
             inputs:
-              PathtoPublish: 'kubernetes/manifests'
-              ArtifactName: 'kubernetes-manifests'
+              PathtoPublish: 'kubernetes/helm-chart'
+              ArtifactName: 'helm-chart'
               publishLocation: 'Container'

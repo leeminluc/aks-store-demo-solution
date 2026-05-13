@@ -1,454 +1,264 @@
-# AKS Store Demo - DevOps Challenge Solution
+# AKS Store Demo Solution
 
-This repository contains a complete solution for deploying the AKS Store Demo application on Azure Kubernetes Service (AKS) using Infrastructure as Code (Terraform), containerization (Docker), and CI/CD automation (Azure DevOps).
+This repository contains the CI/CD pipelines and infrastructure code for deploying the AKS Store Demo application to Azure Kubernetes Service (AKS).
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Architecture Overview](#architecture-overview)
-- [Running Locally](#running-locally)
-- [Infrastructure Deployment](#infrastructure-deployment)
-- [CI/CD Pipeline](#cicd-pipeline)
-- [Kubernetes Deployment](#kubernetes-deployment)
-- [Helm Chart Deployment (Bonus)](#helm-chart-deployment-bonus)
-- [Cleanup](#cleanup)
+- [Infrastructure Setup with Terraform](#infrastructure-setup-with-terraform)
+- [Running Locally with Docker Compose](#running-locally-with-docker-compose)
+- [Azure DevOps Configuration](#azure-devops-configuration)
+- [Project Structure](#project-structure)
+
+---
 
 ## Prerequisites
 
-### Required Tools
+### For Running the app Locally
 
-- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) (v2.50+)
-- [Terraform](https://www.terraform.io/downloads) (v1.5+)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/) (v1.28+)
-- [Helm](https://helm.sh/docs/intro/install/) (v3.12+)
-- [Docker](https://www.docker.com/get-started) (v24+)
-- [Git](https://git-scm.com/downloads)
+| Tool | Version | Description |
+|------|---------|-------------|
+| Docker | 20.x+ | Container runtime |
+| Docker Compose | 2.x+ | Multi-container orchestration |
 
-### Azure Requirements
+### For Azure DevOps Pipelines
 
-- Azure Subscription with Contributor access
-- Azure DevOps organization and project
-- Service Principal for CI/CD pipeline
+| Requirement | Description |
+|-------------|-------------|
+| Azure Subscription | With Owner or Contributor access |
+| Azure DevOps Organization | Create at [dev.azure.com](https://dev.azure.com) |
+| Azure DevOps Project | Create a new project for this solution |
+| GitHub Account | For accessing the source repository |
 
-### Setup Azure CLI
+### Azure Resources Required
 
-```bash
-# Login to Azure
-az login
+Before running the pipelines, ensure you have:
 
-# Set your subscription
-az account set --subscription "<subscription-id>"
+- **Azure Container Registry (ACR)** - For storing Docker images
+- **Azure Kubernetes Service (AKS)** - Target Kubernetes cluster
+- **Resource Group** - Containing the above resources
 
-# Verify current subscription
-az account show
-```
+---
 
-## Architecture Overview
+## Infrastructure Setup with Terraform
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Azure Cloud                              │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │                    Resource Group                          │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐   │  │
-│  │  │     ACR     │  │     AKS     │  │ Log Analytics    │   │  │
-│  │  │  Container  │  │  Kubernetes │  │    Workspace     │   │  │
-│  │  │  Registry   │  │   Cluster   │  │                  │   │  │
-│  │  └──────┬──────┘  └──────┬──────┘  └──────────────────┘   │  │
-│  │         │                │                                 │  │
-│  │         └────────────────┘                                 │  │
-│  └───────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+The infrastructure (AKS cluster, ACR, Resource Group) can be created using Terraform.
 
-### Application Components
+### Prerequisites for Terraform
 
-| Service | Description | Port |
-|---------|-------------|------|
-| store-front | Web frontend (Vue.js) | 8080 |
-| store-admin | Admin dashboard (Vue.js) | 8081 |
-| order-service | Order processing (Node.js) | 3000 |
-| product-service | Product catalog (Rust) | 3002 |
-| makeline-service | Order queue processor (Go) | 3001 |
-| ai-service | AI recommendations (Python) | 5001 |
-| rabbitmq | Message queue | 5672 |
-| mongodb | Order storage | 27017 |
+| Tool | Description |
+|------|-------------|
+| Terraform | >= 1.0 |
+| Azure CLI | Authenticated with `az login` |
 
-## Running Locally
 
-### Using Docker Compose
+### Deploy and Access Infrastructure
 
-1. **Clone the repository:**
+1. **Navigate to the terraform directory:**
    ```bash
-   git clone <your-repo-url>
-   cd aks-store-demo-solution
+   cd terraform
    ```
 
-2. **Start all services:**
-   ```bash
-   cd docker
-   docker-compose up -d
-   ```
-
-3. **Access the application:**
-   - Store Front: http://localhost:8080
-   - Store Admin: http://localhost:8081
-   - RabbitMQ Management: http://localhost:15672 (guest/guest)
-
-4. **Stop all services:**
-   ```bash
-   docker-compose down
-   ```
-
-### Using Kubernetes (Local - minikube/kind)
-
-1. **Start local cluster:**
-   ```bash
-   # Using minikube
-   minikube start
-   
-   # Or using kind
-   kind create cluster
-   ```
-
-2. **Deploy the application:**
-   ```bash
-   kubectl apply -f kubernetes/manifests/aks-store-quickstart.yaml
-   ```
-
-3. **Access the application:**
-   ```bash
-   kubectl port-forward svc/store-front 8080:80
-   ```
-
-## Infrastructure Deployment
-
-### Terraform Configuration
-
-This solution uses the existing Terraform code from the [aks-store-demo repository](https://github.com/Azure-Samples/aks-store-demo). The Terraform code is located in `aks-store-demo/infra/terraform/` and uses Azure Verified Modules (AVM) for best practices.
-
-The Terraform configuration creates:
-- Azure Resource Group
-- Azure Kubernetes Service (AKS) cluster
-- Azure Container Registry (ACR)
-- Required role assignments (ACR pull access for AKS)
-
-### Deploy Infrastructure
-
-1. **Navigate to the demo repository's Terraform directory:**
-   ```bash
-   cd ~/challenge/aks-store-demo/infra/terraform
-   ```
-
-2. **Copy the terraform.tfvars from this solution:**
-   ```bash
-   cp ~/challenge/aks-store-demo-solution/terraform/terraform.tfvars .
-   ```
-
-3. **Initialize Terraform:**
+2. **Initialize Terraform:**
    ```bash
    terraform init
    ```
 
-4. **Plan the deployment:**
+3. **Review the deployment plan:**
    ```bash
    terraform plan -out main.tfplan
    ```
 
-5. **Apply the configuration:**
+4. **Apply the configuration:**
    ```bash
    terraform apply main.tfplan
    ```
 
-6. **Get AKS credentials:**
+5. **Get AKS credentials:**
    ```bash
-   # Get the resource group and cluster name from outputs
-   terraform output
-   
-   # Get AKS credentials
-   az aks get-credentials --resource-group <resource-group-name> --name <cluster-name>
+   az aks get-credentials \
+     --resource-group <resource-group-name> \
+     --name <aks-cluster-name>
    ```
 
-### Terraform Variables
+---
 
-The `terraform.tfvars` file in this solution configures a minimal deployment:
+## Running Locally with Docker Compose
 
-| Variable | Description | Value |
-|----------|-------------|-------|
-| location | Azure region | eastus |
-| environment | Environment name | dev |
-| aks_node_pool_vm_size | VM size for nodes | Standard_D2s_v4 |
-| k8s_namespace | Kubernetes namespace | store-demo |
-| deploy_azure_container_registry | Create ACR | true |
-| deploy_observability_tools | Deploy monitoring | false |
-| deploy_azure_servicebus | Use Azure Service Bus | false |
-| deploy_azure_cosmosdb | Use Azure CosmosDB | false |
-| deploy_azure_openai | Deploy Azure OpenAI | false |
+### Quick Start
 
-## CI/CD Pipeline
-
-### Azure DevOps Setup
-
-1. **Create Azure DevOps Project:**
-   - Go to https://dev.azure.com
-   - Create a new project named "aks-store-demo"
-
-2. **Create Service Connection:**
-   - Go to Project Settings > Service connections
-   - Create "Azure Resource Manager" connection
-   - Select "Service principal (automatic)"
-   - Name it "azure-subscription"
-
-3. **Create Variable Group:**
-   - Go to Pipelines > Library
-   - Create variable group "aks-store-demo-variables"
-   - Add variables:
-     - `azureSubscription`: Your subscription ID
-     - `resourceGroup`: rg-aks-store-demo
-     - `aksCluster`: aks-store-demo
-     - `acrName`: acrstoredemo
-     - `containerRegistry`: acrstoredemo.azurecr.io
-
-4. **Import Pipeline:**
-   - Go to Pipelines > Create Pipeline
-   - Select "Azure Repos Git"
-   - Select "Existing Azure Pipelines YAML file"
-   - Select `/azure-pipelines/azure-pipelines-ci.yml`
-
-### Pipeline Stages
-
-#### CI Pipeline (azure-pipelines-ci.yml)
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Build     │───▶│    Test     │───▶│   Docker    │───▶│    Push     │
-│             │    │             │    │   Build     │    │    to ACR   │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-```
-
-**Stages:**
-1. **Build**: Compile all services
-2. **Test**: Run unit and integration tests
-3. **Docker Build**: Build container images
-4. **Push to ACR**: Push images to Azure Container Registry
-
-#### CD Pipeline (azure-pipelines-cd.yml)
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Deploy    │───▶│   Verify    │───▶│   Notify    │
-│   to AKS    │    │   Health    │    │             │
-└─────────────┘    └─────────────┘    └─────────────┘
-```
-
-**Stages:**
-1. **Deploy to AKS**: Apply Kubernetes manifests
-2. **Verify Health**: Check deployment status
-3. **Notify**: Send deployment notifications
-
-### Running Pipelines
-
-1. **Trigger CI Pipeline:**
-   - Push changes to main branch
-   - Or manually trigger from Azure DevOps
-
-2. **Trigger CD Pipeline:**
-   - Automatically after successful CI
-   - Or manually with approval gates
-
-## Kubernetes Deployment
-
-### Manual Deployment
-
-1. **Create namespace:**
+1. **Navigate to the docker directory:**
    ```bash
-   kubectl create namespace store-demo
+   cd docker
    ```
 
-2. **Deploy NGINX Ingress Controller:**
+2. **Start all services:**
    ```bash
-   kubectl apply -f kubernetes/manifests/ingress-controller.yaml
+   docker-compose up -d
    ```
 
-3. **Deploy the application:**
+3. **Verify services are running:**
    ```bash
-   kubectl apply -f kubernetes/manifests/aks-store-quickstart.yaml -n store-demo
+   docker-compose ps
    ```
 
-4. **Deploy Ingress:**
+4. **Access the application:**
+   - **Store Front:** http://localhost:8080
+   - **RabbitMQ Management:** http://localhost:15672 (username: `username`, password: `password`)
+
+5. **Stop all services:**
    ```bash
-   kubectl apply -f kubernetes/manifests/ingress.yaml -n store-demo
+   docker-compose down
    ```
 
-5. **Get Ingress IP:**
-   ```bash
-   kubectl get ingress -n store-demo
-   ```
+---
 
-### Verify Deployment
+## Azure DevOps Configuration
 
-```bash
-# Check pods
-kubectl get pods -n store-demo
+### Step 1: Create Service Connections
 
-# Check services
-kubectl get services -n store-demo
+Navigate to **Project Settings > Service connections** and create the following:
 
-# Check ingress
-kubectl get ingress -n store-demo
+#### 1.1 GitHub Connection
 
-# View logs
-kubectl logs -f deployment/store-front -n store-demo
-```
+| Field | Value |
+|-------|-------|
+| Connection type | GitHub |
+| Connection name | `github-connection` |
+| Authentication | OAuth or Personal Access Token |
 
-## Helm Chart Deployment (Bonus)
+This connection allows the pipeline to fetch source code from `Azure-Samples/aks-store-demo`.
 
-### Install with Helm
+#### 1.2 Azure Container Registry Connection
 
-1. **Navigate to Helm chart:**
-   ```bash
-   cd kubernetes/helm-chart
-   ```
+| Field | Value |
+|-------|-------|
+| Connection type | Docker Registry |
+| Connection name | `acr-connection` |
+| Registry type | Azure Container Registry |
+| Azure subscription | Your subscription |
+| Azure Container Registry | Your ACR instance |
 
-2. **Update dependencies:**
-   ```bash
-   helm dependency update
-   ```
+This connection allows the pipeline to push Docker images to your ACR.
 
-3. **Install the chart:**
-   ```bash
-   helm install aks-store-demo . -n store-demo --create-namespace
-   ```
+#### 1.3 Azure Resource Manager Connection
 
-4. **Upgrade with custom values:**
-   ```bash
-   helm upgrade aks-store-demo . -n store-demo -f values-prod.yaml
-   ```
+| Field | Value |
+|-------|-------|
+| Connection type | Azure Resource Manager |
+| Connection name | `azure-connection` |
+| Authentication method | Service principal (automatic) |
+| Scope level | Subscription |
+| Subscription | Your subscription |
 
-### Helm Chart Features
+This connection allows the pipeline to deploy to AKS.
 
-- **Resource Limits**: Configured CPU and memory limits for all services
-- **Network Policies**: Restrict inter-service communication
-- **Horizontal Pod Autoscaler**: Auto-scaling support
-- **Ingress**: Configurable ingress with TLS support
-- **Security Contexts**: Non-root containers, read-only filesystems
+---
 
-### Custom Values
+### Step 2: Create Variable Group
 
-Create a custom values file:
+Navigate to **Pipelines > Library** and create a variable group named `aks-store-demo-variables`:
 
-```yaml
-# values-custom.yaml
-replicaCount: 2
+| Variable Name | Example Value | Description |
+|---------------|---------------|-------------|
+| `containerRegistryName` | `acrdemozebra95` | ACR name (without .azurecr.io) |
+| `containerRegistry` | `acrdemozebra95.azurecr.io` | Full ACR login server URL |
+| `resourceGroup` | `rg-demozebra95` | Resource group name |
+| `aksCluster` | `aks-demozebra95` | AKS cluster name |
 
-namespace: production
+---
 
-storeFront:
-  image:
-    repository: acrstoredemo.azurecr.io/store-front
-    tag: "latest"
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+### Step 3: Import Pipelines
 
-ingress:
-  enabled: true
-  className: nginx
-  hosts:
-    - host: store.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls:
-    - secretName: store-tls
-      hosts:
-        - store.example.com
-```
+#### 3.1 Import CI Pipeline
 
-## Cleanup
+1. Go to **Pipelines > Create Pipeline**
+2. Select **Azure Repos Git** (or your Git provider)
+3. Select your repository
+4. Select **Existing Azure Pipelines YAML file**
+5. Select the branch and path: `/azure-pipelines/azure-pipelines-ci.yml`
+6. Click **Save** (don't run yet)
 
-### Delete Kubernetes Resources
+#### 3.2 Import CD Pipeline
 
-```bash
-kubectl delete namespace store-demo
-```
+1. Go to **Pipelines > Create Pipeline**
+2. Select **Azure Repos Git** (or your Git provider)
+3. Select your repository
+4. Select **Existing Azure Pipelines YAML file**
+5. Select the branch and path: `/azure-pipelines/azure-pipelines-cd.yml`
+6. Click **Save** (don't run yet)
 
-### Destroy Infrastructure
 
-```bash
-cd terraform
-terraform destroy
-```
+---
 
-### Delete Azure Resources
+### Step 4: Run the Pipelines
 
-```bash
-az group delete --name rg-aks-store-demo --yes --no-wait
-```
+1. **Run the CI Pipeline first:**
+   - Go to Pipelines
+   - Select the CI pipeline
+   - Click **Run pipeline**
+   - This will build and push Docker images to ACR
 
-## Troubleshooting
+2. **Run the CD Pipeline:**
+   - The CD pipeline will trigger automatically after CI completes
+   - Or manually run it from the Pipelines page
 
-### Common Issues
+---
 
-1. **Image Pull Errors:**
-   ```bash
-   # Check ACR credentials
-   kubectl create secret docker-registry acr-secret \
-     --docker-server=acrstoredemo.azurecr.io \
-     --docker-username=<username> \
-     --docker-password=<password>
-   ```
+## Pipeline Overview
 
-2. **Ingress Not Working:**
-   ```bash
-   # Check ingress controller logs
-   kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx
-   ```
+### CI Pipeline (`azure-pipelines-ci.yml`)
 
-3. **Pod Stuck in Pending:**
-   ```bash
-   # Describe pod for events
-   kubectl describe pod <pod-name> -n store-demo
-   ```
+The CI pipeline follows the **Test → Push** pattern:
+
+1. **Test Stage** - Builds and tests images:
+   - Fetches source code from `Azure-Samples/aks-store-demo` GitHub repository
+   - Builds Docker images using Docker Compose
+   - Runs health check tests on all services:
+     - store-front: http://localhost:8080/health
+     - order-service: http://localhost:3000/health
+     - product-service: http://localhost:3002/health
+   - Stops services after tests pass
+
+2. **Push Stage** - Builds and pushes to ACR (only if tests pass):
+   - Builds Docker images for 3 microservices:
+     - store-front
+     - order-service
+     - product-service
+   - Pushes images to Azure Container Registry
+   - Publishes Helm chart as artifacts for the CD pipeline
+
+### CD Pipeline (`azure-pipelines-cd.yml`)
+
+The CD pipeline performs the following:
+
+1. **Downloads Helm chart** from the CI pipeline artifacts
+2. **Updates Helm dependencies** (includes NGINX Ingress Controller)
+3. **Deploys to AKS** using HelmDeploy task with:
+   - Resource limits for all containers
+   - Network policies for inter-service security
+   - Security contexts (runAsNonRoot)
+   - Health probes (startup, readiness, liveness)
+4. **Verifies deployment** health
+
+---
 
 ## Project Structure
 
 ```
 aks-store-demo-solution/
-├── README.md                          # This file
-├── kubernetes/
-│   ├── manifests/
-│   │   ├── aks-store-quickstart.yaml   # Main application manifest
-│   │   ├── ingress-controller.yaml     # NGINX Ingress Controller
-│   │   └── ingress.yaml                # Ingress resource definitions
-│   └── helm-chart/
-│       ├── Chart.yaml
-│       ├── values.yaml
-│       └── templates/
-├── terraform/
-│   ├── main.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── kubernetes.tf
-│   ├── acr.tf
-│   └── terraform.tfvars
 ├── azure-pipelines/
-│   ├── azure-pipelines-ci.yml         # CI pipeline
-│   └── azure-pipelines-cd.yml         # CD pipeline
-└── docker/
-    └── docker-compose.yml              # Local development
+│   ├── azure-pipelines-ci.yml    # CI pipeline definition
+│   └── azure-pipelines-cd.yml    # CD pipeline definition
+├── docker/
+│   └── docker-compose.yml        # Local development setup
+├── kubernetes/
+│   └── helm-chart/               # Helm chart for deployment
+│       ├── Chart.yaml            # Chart metadata & dependencies
+│       ├── values.yaml           # Default values
+│       └── templates/            # Kubernetes templates
+├── terraform/
+│   └── main.tf                   # Infrastructure as code
+└── README.md                     # This file
 ```
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Original [AKS Store Demo](https://github.com/Azure-Samples/aks-store-demo) repository
-- Azure Kubernetes Service documentation
-- Terraform Azure Provider documentation

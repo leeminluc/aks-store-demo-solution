@@ -1,0 +1,257 @@
+# =============================================================================
+# AKS Store Demo - Helm Values
+# Matches aks-store-quickstart.yaml deployment
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Global Settings
+# -----------------------------------------------------------------------------
+global:
+  namespace: store-demo
+  environment: dev
+  imageRegistry: ghcr.io/azure-samples/aks-store-demo
+  imageTag: "2.0.0"
+  imagePullSecrets: []
+
+# -----------------------------------------------------------------------------
+# NGINX Ingress Controller
+# -----------------------------------------------------------------------------
+ingress-nginx:
+  enabled: true
+  controller:
+    service:
+      type: LoadBalancer
+    config:
+      proxy-body-size: "10m"
+      proxy-connect-timeout: "60"
+      proxy-send-timeout: "60"
+      proxy-read-timeout: "60"
+
+# -----------------------------------------------------------------------------
+# Network Policies
+# -----------------------------------------------------------------------------
+networkPolicy:
+  enabled: true
+  # Allow ingress traffic from specific namespaces
+  ingressFrom: []
+
+# -----------------------------------------------------------------------------
+# Security Contexts
+# -----------------------------------------------------------------------------
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+# -----------------------------------------------------------------------------
+# Store Front (Web Frontend)
+# -----------------------------------------------------------------------------
+storeFront:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: store-front
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  
+  resources:
+    requests:
+      cpu: 1m
+      memory: 200Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  
+  env:
+    - name: PRODUCT_SERVICE_URL
+      value: "http://product-service:3002/"
+    - name: ORDER_SERVICE_URL
+      value: "http://order-service:3000/"
+  
+  probes:
+    startup:
+      httpGet:
+        path: /health
+        port: 8080
+      failureThreshold: 3
+      initialDelaySeconds: 5
+      periodSeconds: 5
+    readiness:
+      httpGet:
+        path: /health
+        port: 8080
+      failureThreshold: 3
+      initialDelaySeconds: 3
+      periodSeconds: 3
+    liveness:
+      httpGet:
+        path: /health
+        port: 8080
+      failureThreshold: 5
+      initialDelaySeconds: 3
+      periodSeconds: 3
+
+# -----------------------------------------------------------------------------
+# Order Service
+# -----------------------------------------------------------------------------
+orderService:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: order-service
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+  
+  resources:
+    requests:
+      cpu: 1m
+      memory: 50Mi
+    limits:
+      cpu: 75m
+      memory: 128Mi
+  
+  env:
+    - name: ORDER_QUEUE_HOSTNAME
+      value: "rabbitmq"
+    - name: ORDER_QUEUE_PORT
+      value: "5672"
+    - name: ORDER_QUEUE_USERNAME
+      value: "username"
+    - name: ORDER_QUEUE_PASSWORD
+      value: "password"
+    - name: ORDER_QUEUE_NAME
+      value: "orders"
+    - name: FASTIFY_ADDRESS
+      value: "0.0.0.0"
+  
+  probes:
+    startup:
+      httpGet:
+        path: /health
+        port: 3000
+      failureThreshold: 5
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readiness:
+      httpGet:
+        path: /health
+        port: 3000
+      failureThreshold: 3
+      initialDelaySeconds: 3
+      periodSeconds: 5
+    liveness:
+      httpGet:
+        path: /health
+        port: 3000
+      failureThreshold: 5
+      initialDelaySeconds: 3
+      periodSeconds: 3
+
+# -----------------------------------------------------------------------------
+# Product Service
+# -----------------------------------------------------------------------------
+productService:
+  enabled: true
+  replicaCount: 1
+  
+  image:
+    repository: product-service
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3002
+  
+  resources:
+    requests:
+      cpu: 1m
+      memory: 1Mi
+    limits:
+      cpu: 2m
+      memory: 20Mi
+  
+  env:
+    - name: AI_SERVICE_URL
+      value: "http://ai-service:5001/"
+  
+  probes:
+    readiness:
+      httpGet:
+        path: /health
+        port: 3002
+      failureThreshold: 3
+      initialDelaySeconds: 3
+      periodSeconds: 5
+    liveness:
+      httpGet:
+        path: /health
+        port: 3002
+      failureThreshold: 5
+      initialDelaySeconds: 3
+      periodSeconds: 3
+
+# -----------------------------------------------------------------------------
+# RabbitMQ (Message Queue)
+# -----------------------------------------------------------------------------
+rabbitmq:
+  enabled: true
+  
+  auth:
+    username: username
+    password: password
+  
+  resources:
+    requests:
+      cpu: 10m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# -----------------------------------------------------------------------------
+# Ingress Configuration
+# -----------------------------------------------------------------------------
+ingress:
+  enabled: true
+  className: nginx
+  
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  
+  hosts:
+    - host: store.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: store-front
+          port: 80
+  
+  tls: []
+
+# -----------------------------------------------------------------------------
+# Secrets
+# -----------------------------------------------------------------------------
+secrets:
+  rabbitmq:
+    create: true
+    username: username
+    password: password

@@ -19,18 +19,18 @@ variables:
     value: 'azure-connection'
   - name: kubernetesNamespace
     value: 'store-demo'
+  - name: helmReleaseName
+    value: 'aks-store-demo'
   - name: vmImageName
     value: 'ubuntu-latest'
 
 stages:
-  # ---------------------------------------------------------------------------
-  # Deploy to AKS
-  # ---------------------------------------------------------------------------
+  # Deploy to AKS using Helm
   - stage: Deploy
     displayName: Deploy to AKS
     jobs:
       - deployment: Deploy
-        displayName: Deploy to AKS
+        displayName: Deploy to AKS with Helm
         environment: 'aks-store-demo'
         pool:
           vmImage: $(vmImageName)
@@ -38,39 +38,48 @@ stages:
           runOnce:
             deploy:
               steps:
+                - checkout: self
+                  displayName: 'Checkout solution repository'
+
                 - download: ci-pipeline
-                  artifact: kubernetes-manifests
-                  patterns: '**/*.yaml'
+                  artifact: helm-chart
+                  patterns: '**/*'
 
-                - task: KubernetesManifest@1
-                  displayName: Create namespace if not exists
+                # Install Helm
+                - task: HelmInstaller@1
+                  displayName: 'Install Helm'
                   inputs:
-                    action: 'deploy'
-                    connectionType: 'azureResourceManager'
-                    azureSubscriptionConnection: $(azureSubscription)
-                    azureResourceGroup: $(resourceGroup)
-                    kubernetesCluster: $(aksCluster)
-                    namespace: 'default'
-                    manifests: |
-                      $(Pipeline.Workspace)/kubernetes-manifests/namespace.yaml
+                    helmVersionToInstall: '3.13.0'
 
-                - task: KubernetesManifest@1
-                  displayName: Deploy application
+                # Update Helm dependencies
+                - script: |
+                    cd $(Pipeline.Workspace)/helm-chart
+                    helm dependency update
+                  displayName: 'Update Helm dependencies'
+
+                # Deploy using Helm (namespace is created by the chart)
+                - task: HelmDeploy@0
+                  displayName: 'Deploy application with Helm'
                   inputs:
-                    action: 'deploy'
-                    connectionType: 'azureResourceManager'
-                    azureSubscriptionConnection: $(azureSubscription)
+                    connectionType: 'Azure Resource Manager'
+                    azureSubscription: $(azureSubscription)
                     azureResourceGroup: $(resourceGroup)
                     kubernetesCluster: $(aksCluster)
                     namespace: $(kubernetesNamespace)
-                    manifests: |
-                      $(Pipeline.Workspace)/kubernetes-manifests/ingress.yaml
-                    containers: |
-                      $(containerRegistry)/store-front:$(imageTag)
-                      $(containerRegistry)/store-admin:$(imageTag)
-                      $(containerRegistry)/order-service:$(imageTag)
-                      $(containerRegistry)/product-service:$(imageTag)
-                      $(containerRegistry)/makeline-service:$(imageTag)
+                    command: 'upgrade'
+                    chartType: 'FilePath'
+                    chartPath: '$(Pipeline.Workspace)/helm-chart'
+                    releaseName: $(helmReleaseName)
+                    install: true
+                    force: true
+                    valueFile: '$(Pipeline.Workspace)/helm-chart/values.yaml'
+                    overrideValues: |
+                      global.imageRegistry=$(containerRegistry)
+                      global.imageTag=$(imageTag)
+                      ingress.enabled=true
+                      ingress.className=nginx
+                      networkPolicy.enabled=true
+                    arguments: '--timeout 5m --wait'
 
   # Verify Deployment
   - stage: Verify
@@ -83,7 +92,7 @@ stages:
           vmImage: $(vmImageName)
         steps:
           - task: Kubernetes@1
-            displayName: Check deployment status
+            displayName: 'Check deployment status'
             inputs:
               connectionType: 'Azure Resource Manager'
               azureSubscriptionEndpoint: $(azureSubscription)
@@ -93,8 +102,28 @@ stages:
               arguments: 'pods -n $(kubernetesNamespace)'
               outputFormat: 'jsonpath={.items[*].status.phase}'
 
+          - task: Kubernetes@1
+            displayName: 'Check Helm release status'
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionEndpoint: $(azureSubscription)
+              azureResourceGroup: $(resourceGroup)
+              kubernetesCluster: $(aksCluster)
+              command: 'get'
+              arguments: 'all -n $(kubernetesNamespace)'
+
           - script: |
-              echo "Deployment completed!"
+              echo "=========================================="
+              echo "Deployment completed successfully!"
+              echo "=========================================="
               echo "Image Tag: $(imageTag)"
               echo "Namespace: $(kubernetesNamespace)"
+              echo "Helm Release: $(helmReleaseName)"
+              echo ""
+              echo "Features deployed:"
+              echo "  - Resource limits for all containers"
+              echo "  - Network policies for inter-service security"
+              echo "  - Security contexts (runAsNonRoot)"
+              echo "  - Health probes (startup, readiness, liveness)"
+              echo "=========================================="
             displayName: 'Print deployment summary'

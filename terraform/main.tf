@@ -1,5 +1,5 @@
 module "aks_store" {
-  source = "github.com/Azure-Samples/aks-store-demo//infra/terraform?ref=2.1.0"
+  source = "github.com/Azure-Samples/aks-store-demo//infra/terraform?ref=main"
 
   environment                     = "demo"
   location                        = "westus2"
