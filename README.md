@@ -128,7 +128,7 @@ Navigate to **Pipelines > Library** and create a variable group named `aks-store
 2. Select **GitHub** (select your forked repository)
 3. Select **Existing Azure Pipelines YAML file**
 4. Select the path: `/azure-pipelines/azure-pipelines-ci-images.yml`
-5. Save the pipeline as `aks-store-demo-ci-images`
+5. Rename the pipeline to `aks-store-demo-ci-images`
 
 #### 3.2 Import CI Pipeline (Package Helm)
 
@@ -136,7 +136,7 @@ Navigate to **Pipelines > Library** and create a variable group named `aks-store
 2. Select **GitHub** (select your forked repository)
 3. Select **Existing Azure Pipelines YAML file**
 4. Select the path: `/azure-pipelines/azure-pipelines-ci-helm.yml`
-5. Save the pipeline as `aks-store-demo-ci-helm`
+5. Rename the pipeline to `aks-store-demo-ci-helm`
 
 #### 3.3 Import CD Pipeline
 
@@ -144,7 +144,7 @@ Navigate to **Pipelines > Library** and create a variable group named `aks-store
 2. Select **GitHub** (select your forked repository)
 3. Select **Existing Azure Pipelines YAML file**
 4. Select the path: `/azure-pipelines/azure-pipelines-cd.yml`
-5. Save the pipeline as `aks-store-demo-cd`
+5. Rename the pipeline to `aks-store-demo-cd`
 
 ---
 
