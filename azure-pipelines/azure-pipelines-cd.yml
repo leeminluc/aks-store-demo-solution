@@ -45,6 +45,15 @@ stages:
                   artifact: helm-chart
                   patterns: '**/*'
 
+                # Install kubelogin for Azure AD-enabled AKS clusters
+                - script: |
+                    curl -LO "https://github.com/Azure/kubelogin/releases/download/v0.0.26/kubelogin-linux-amd64.zip"
+                    unzip kubelogin-linux-amd64.zip
+                    sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+                    rm -rf kubelogin-linux-amd64.zip bin
+                    kubelogin --version
+                  displayName: 'Install kubelogin'
+
                 # Install Helm
                 - task: HelmInstaller@1
                   displayName: 'Install Helm'
@@ -91,6 +100,15 @@ stages:
         pool:
           vmImage: $(vmImageName)
         steps:
+          # Install kubelogin for Azure AD-enabled AKS clusters
+          - script: |
+              curl -LO "https://github.com/Azure/kubelogin/releases/download/v0.0.26/kubelogin-linux-amd64.zip"
+              unzip kubelogin-linux-amd64.zip
+              sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+              rm -rf kubelogin-linux-amd64.zip bin
+              kubelogin --version
+            displayName: 'Install kubelogin'
+
           - task: Kubernetes@1
             displayName: 'Check deployment status'
             inputs:
