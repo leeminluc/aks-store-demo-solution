@@ -58,7 +58,7 @@ stages:
                       echo "Agent IP: $AGENT_IP"
                       
                       # Get current authorized IP ranges
-                      CURRENT_IPS=$(az aks show --resource-group $(resourceGroup) --name $(aksCluster) --query "apiServerAccessProfile.authorizedIpRanges" -o tsv)
+                      CURRENT_IPS=$(az aks show --resource-group $(resourceGroup) --name $(aksCluster) --query "apiServerAccessProfile.authorizedIpRanges" -o tsv | tr '\n' ',' | sed 's/,$//')
                       echo "Current authorized IPs: $CURRENT_IPS"
                       
                       # Add agent IP if not already present
@@ -69,12 +69,12 @@ stages:
                           echo "Agent IP already in authorized list"
                           NEW_IPS="$CURRENT_IPS"
                         else
-                          NEW_IPS="$CURRENT_IPS $AGENT_IP/32"
+                          NEW_IPS="$CURRENT_IPS,$AGENT_IP/32"
                         fi
                       fi
                       
                       echo "Updating authorized IPs to: $NEW_IPS"
-                      az aks update --resource-group $(resourceGroup) --name $(aksCluster) --api-server-authorized-ip-ranges $NEW_IPS
+                      az aks update --resource-group $(resourceGroup) --name $(aksCluster) --api-server-authorized-ip-ranges "$NEW_IPS"
                       
                       # Wait for update to propagate
                       echo "Waiting 60 seconds for IP update to propagate..."
@@ -103,7 +103,7 @@ stages:
                     helm dependency update
                   displayName: 'Update Helm dependencies'
 
-                # Deploy using Helm (namespace is created by the chart)
+                # Deploy using Helm
                 - task: HelmDeploy@0
                   displayName: 'Deploy application with Helm'
                   inputs:
@@ -149,8 +149,8 @@ stages:
                 AGENT_IP=$(curl -s https://api.ipify.org)
                 echo "Agent IP: $AGENT_IP"
                 
-                # Get current authorized IP ranges
-                CURRENT_IPS=$(az aks show --resource-group $(resourceGroup) --name $(aksCluster) --query "apiServerAccessProfile.authorizedIpRanges" -o tsv)
+                # Get current authorized IP ranges (convert newlines to commas)
+                CURRENT_IPS=$(az aks show --resource-group $(resourceGroup) --name $(aksCluster) --query "apiServerAccessProfile.authorizedIpRanges" -o tsv | tr '\n' ',' | sed 's/,$//')
                 echo "Current authorized IPs: $CURRENT_IPS"
                 
                 # Add agent IP if not already present
@@ -161,12 +161,12 @@ stages:
                     echo "Agent IP already in authorized list"
                     NEW_IPS="$CURRENT_IPS"
                   else
-                    NEW_IPS="$CURRENT_IPS $AGENT_IP/32"
+                    NEW_IPS="$CURRENT_IPS,$AGENT_IP/32"
                   fi
                 fi
                 
                 echo "Updating authorized IPs to: $NEW_IPS"
-                az aks update --resource-group $(resourceGroup) --name $(aksCluster) --api-server-authorized-ip-ranges $NEW_IPS
+                az aks update --resource-group $(resourceGroup) --name $(aksCluster) --api-server-authorized-ip-ranges "$NEW_IPS"
                 
                 # Wait for update to propagate
                 echo "Waiting 60 seconds for IP update to propagate..."
