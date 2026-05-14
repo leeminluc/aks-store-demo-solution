@@ -235,8 +235,9 @@ ingress:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
   
+  # No host specified - accessible by IP address
   hosts:
-    - host: store.local
+    - host: ""
       paths:
         - path: /
           pathType: Prefix

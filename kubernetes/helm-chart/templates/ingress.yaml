@@ -18,6 +18,7 @@ spec:
   {{- end }}
   rules:
     {{- range .Values.ingress.hosts }}
+    {{- if .host }}
     - host: {{ .host | quote }}
       http:
         paths:
@@ -30,5 +31,18 @@ spec:
                 port:
                   number: {{ .port }}
           {{- end }}
+    {{- else }}
+    - http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ .service }}
+                port:
+                  number: {{ .port }}
+          {{- end }}
+    {{- end }}
     {{- end }}
 {{- end }}
