@@ -5,54 +5,36 @@ This repository contains the CI/CD pipelines and infrastructure code for deployi
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Infrastructure Setup with Terraform](#infrastructure-setup-with-terraform)
-- [Running Locally with Docker Compose](#running-locally-with-docker-compose)
-- [Azure DevOps Configuration](#azure-devops-configuration)
+- [Deploy to AKS with CI/CD Pipeline](#deploy-to-aks-with-cicd-pipeline)
+- [Run Locally with Docker Compose](#run-locally-with-docker-compose)
 - [Project Structure](#project-structure)
 
 ---
 
 ## Prerequisites
 
-### For Running the app Locally
-
-| Tool | Version | Description |
-|------|---------|-------------|
-| Docker | 20.x+ | Container runtime |
-| Docker Compose | 2.x+ | Multi-container orchestration |
-
-### For Azure DevOps Pipelines
+### For CI/CD Pipeline Deployment
 
 | Requirement | Description |
 |-------------|-------------|
 | Azure Subscription | With Owner or Contributor access |
 | Azure DevOps Organization | Create at [dev.azure.com](https://dev.azure.com) |
 | Azure DevOps Project | Create a new project for this solution |
-| GitHub Account | For accessing the source repository |
+| Terraform | >= 1.0 (for infrastructure setup) |
+| Azure CLI | Authenticated with `az login` |
 
-### Azure Resources Required
+### For Running Locally
 
-Before running the pipelines, ensure you have:
-
-- **Azure Container Registry (ACR)** - For storing Docker images
-- **Azure Kubernetes Service (AKS)** - Target Kubernetes cluster
-- **Resource Group** - Containing the above resources
+| Tool | Version | Description |
+|------|---------|-------------|
+| Docker | 20.x+ | Container runtime |
+| Docker Compose | 2.x+ | Multi-container orchestration |
 
 ---
 
-## Infrastructure Setup with Terraform
+## Deploy to AKS with CI/CD Pipeline
 
-The infrastructure (AKS cluster, ACR, Resource Group) can be created using Terraform.
-
-### Prerequisites for Terraform
-
-| Tool | Description |
-|------|-------------|
-| Terraform | >= 1.0 |
-| Azure CLI | Authenticated with `az login` |
-
-
-### Deploy and Access Infrastructure
+### Step 1: Create Azure Infrastructure with Terraform
 
 1. **Navigate to the terraform directory:**
    ```bash
@@ -74,7 +56,13 @@ The infrastructure (AKS cluster, ACR, Resource Group) can be created using Terra
    terraform apply main.tfplan
    ```
 
-5. **Get AKS credentials:**
+5. **Note the output values** - You'll need these for the CI/CD configuration:
+   - `resource_group_name` - Resource group name
+   - `aks_cluster_name` - AKS cluster name
+   - `acr_login_server` - ACR login server URL
+   - `acr_name` - ACR name (without .azurecr.io)
+
+6. **Get AKS credentials:**
    ```bash
    az aks get-credentials \
      --resource-group <resource-group-name> \
@@ -83,16 +71,163 @@ The infrastructure (AKS cluster, ACR, Resource Group) can be created using Terra
 
 ---
 
-## Running Locally with Docker Compose
+### Step 2: Configure Azure DevOps
 
-The Docker Compose setup pulls images from your Azure Container Registry (ACR). This allows you to test the same images that are deployed to AKS.
+#### 2.1 Create Service Connections
+
+Navigate to **Project Settings > Service connections** and create the following:
+
+**GitHub Connection:**
+
+| Field | Value |
+|-------|-------|
+| Connection type | GitHub |
+| Connection name | `github-connection` |
+| Authentication | OAuth or Personal Access Token |
+
+**Azure Container Registry Connection:**
+
+| Field | Value |
+|-------|-------|
+| Connection type | Docker Registry |
+| Connection name | `acr-connection` |
+| Registry type | Azure Container Registry |
+| Azure subscription | Your subscription |
+| Azure Container Registry | Your ACR instance |
+
+**Azure Resource Manager Connection:**
+
+| Field | Value |
+|-------|-------|
+| Connection type | Azure Resource Manager |
+| Connection name | `azure-connection` |
+| Authentication method | Service principal (automatic) |
+| Scope level | Subscription |
+| Subscription | Your subscription |
+
+#### 2.2 Create Variable Group
+
+Navigate to **Pipelines > Library** and create a variable group named `aks-store-demo-variables`:
+
+| Variable Name | Example Value | Description |
+|---------------|---------------|-------------|
+| `containerRegistryName` | `acrdemoguppy53` | ACR name (without .azurecr.io) |
+| `containerRegistry` | `acrdemoguppy53.azurecr.io` | Full ACR login server URL |
+| `resourceGroup` | `rg-demoguppy53` | Resource group name |
+| `aksCluster` | `aks-demoguppy53` | AKS cluster name |
+
+---
+
+### Step 3: Import Pipelines
+
+#### 3.1 Import CI Pipeline (Build Images)
+
+1. Go to **Pipelines > Create Pipeline**
+2. Select **Azure Repos Git** (or your Git provider)
+3. Select your repository
+4. Select **Existing Azure Pipelines YAML file**
+5. Select the path: `/azure-pipelines/azure-pipelines-ci-images.yml`
+6. Save the pipeline as `aks-store-demo-ci-images`
+
+#### 3.2 Import CI Pipeline (Package Helm)
+
+1. Go to **Pipelines > Create Pipeline**
+2. Select **Azure Repos Git** (or your Git provider)
+3. Select your repository
+4. Select **Existing Azure Pipelines YAML file**
+5. Select the path: `/azure-pipelines/azure-pipelines-ci-helm.yml`
+6. Save the pipeline as `aks-store-demo-ci-helm`
+
+#### 3.3 Import CD Pipeline
+
+1. Go to **Pipelines > Create Pipeline**
+2. Select **Azure Repos Git** (or your Git provider)
+3. Select your repository
+4. Select **Existing Azure Pipelines YAML file**
+5. Select the path: `/azure-pipelines/azure-pipelines-cd.yml`
+6. Save the pipeline as `aks-store-demo-cd`
+
+---
+
+### Step 4: Configure AKS for CI/CD
+
+After the AKS cluster is created, run these commands to enable the CD pipeline to deploy:
+
+**4.1 Disable Authorized IP Ranges:**
+```bash
+az aks update \
+  --resource-group <resource-group-name> \
+  --name <aks-cluster-name> \
+  --api-server-authorized-ip-ranges ""
+```
+
+**4.2 Get the Service Principal Object ID:**
+
+Go to **Azure Portal > Azure Active Directory > Enterprise applications** and search for the service principal name (same as your Azure DevOps project name). Copy the Object ID.
+
+**4.3 Create Role Assignment:**
+```bash
+az role assignment create \
+  --assignee <service-principal-object-id> \
+  --role "Contributor" \
+  --scope /subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.ContainerService/managedClusters/<aks-cluster-name>
+```
+
+**4.4 Create ClusterRoleBinding:**
+```bash
+kubectl create clusterrolebinding azure-devops-admin-binding \
+  --clusterrole=cluster-admin \
+  --user=<service-principal-object-id>
+```
+
+---
+
+### Step 5: Run the Pipelines
+
+Run the pipelines in this order:
+
+**5.1 Run CI Pipeline (Build Images):**
+1. Go to Pipelines
+2. Select `aks-store-demo-ci-images`
+3. Click **Run pipeline**
+4. This builds and pushes Docker images to ACR
+
+**5.2 Run CI Pipeline (Package Helm):**
+1. Go to Pipelines
+2. Select `aks-store-demo-ci-helm`
+3. Click **Run pipeline**
+4. This packages and publishes the Helm chart
+
+**5.3 Run CD Pipeline:**
+1. Go to Pipelines
+2. Select `aks-store-demo-cd`
+3. Click **Run pipeline**
+4. This installs NGINX Ingress Controller and deploys the application
+
+---
+
+### Step 6: Access the Application
+
+1. **Get the Ingress Controller external IP:**
+   ```bash
+   kubectl get svc -n ingress-nginx
+   ```
+
+2. **Access the application:**
+   Open a browser and navigate to `http://<EXTERNAL-IP>`
+
+---
+
+## Run Locally with Docker Compose
+
+The application can be run locally using Docker Compose. This pulls images from your Azure Container Registry (ACR) - the same images built by the CI pipeline.
 
 ### Prerequisites
 
-- Docker images must be built and pushed to ACR (run the CI pipeline first)
+- CI pipeline must have run successfully to push images to ACR
 - Azure CLI installed and authenticated
 
-### Steps to Run
+### Steps
 
 1. **Login to Azure Container Registry:**
    ```bash
@@ -100,7 +235,7 @@ The Docker Compose setup pulls images from your Azure Container Registry (ACR). 
    ```
    Example:
    ```bash
-   az acr login --name acrdemozebra95
+   az acr login --name acrdemoguppy53
    ```
 
 2. **Set environment variables:**
@@ -110,7 +245,7 @@ The Docker Compose setup pulls images from your Azure Container Registry (ACR). 
    ```
    Example:
    ```bash
-   export ACR_REGISTRY=acrdemozebra95.azurecr.io
+   export ACR_REGISTRY=acrdemoguppy53.azurecr.io
    export IMAGE_TAG=latest
    ```
 
@@ -138,170 +273,6 @@ The Docker Compose setup pulls images from your Azure Container Registry (ACR). 
    docker-compose down
    ```
 
-### Troubleshooting
-
-If you get an authentication error, ensure you're logged in to ACR:
-```bash
-az acr login --name <acr-name>
-```
-
-If images are not found, ensure the CI pipeline has completed and pushed images to ACR.
-
----
-
-## Azure DevOps Configuration
-
-### Step 1: Create Service Connections
-
-Navigate to **Project Settings > Service connections** and create the following:
-
-#### 1.1 GitHub Connection
-
-| Field | Value |
-|-------|-------|
-| Connection type | GitHub |
-| Connection name | `github-connection` |
-| Authentication | OAuth or Personal Access Token |
-
-This connection allows the pipeline to fetch source code from `Azure-Samples/aks-store-demo`.
-
-#### 1.2 Azure Container Registry Connection
-
-| Field | Value |
-|-------|-------|
-| Connection type | Docker Registry |
-| Connection name | `acr-connection` |
-| Registry type | Azure Container Registry |
-| Azure subscription | Your subscription |
-| Azure Container Registry | Your ACR instance |
-
-This connection allows the pipeline to push Docker images to your ACR.
-
-#### 1.3 Azure Resource Manager Connection
-
-| Field | Value |
-|-------|-------|
-| Connection type | Azure Resource Manager |
-| Connection name | `azure-connection` |
-| Authentication method | Service principal (automatic) |
-| Scope level | Subscription |
-| Subscription | Your subscription |
-
-This connection allows the pipeline to deploy to AKS.
-
----
-
-### Step 2: Create Variable Group
-
-Navigate to **Pipelines > Library** and create a variable group named `aks-store-demo-variables`:
-
-| Variable Name | Example Value | Description |
-|---------------|---------------|-------------|
-| `containerRegistryName` | `acrdemozebra95` | ACR name (without .azurecr.io) |
-| `containerRegistry` | `acrdemozebra95.azurecr.io` | Full ACR login server URL |
-| `resourceGroup` | `rg-demozebra95` | Resource group name |
-| `aksCluster` | `aks-demozebra95` | AKS cluster name |
-
----
-
-### Step 3: Import Pipelines
-
-#### 3.1 Import CI Pipeline
-
-1. Go to **Pipelines > Create Pipeline**
-2. Select **Azure Repos Git** (or your Git provider)
-3. Select your repository
-4. Select **Existing Azure Pipelines YAML file**
-5. Select the branch and path: `/azure-pipelines/azure-pipelines-ci.yml`
-6. Click **Save** (don't run yet)
-
-#### 3.2 Import CD Pipeline
-
-1. Go to **Pipelines > Create Pipeline**
-2. Select **Azure Repos Git** (or your Git provider)
-3. Select your repository
-4. Select **Existing Azure Pipelines YAML file**
-5. Select the branch and path: `/azure-pipelines/azure-pipelines-cd.yml`
-6. Click **Save** (don't run yet)
-
-
----
-
-### Step 4: Run the Pipelines
-
-1. **Run the CI Pipeline first:**
-   - Go to Pipelines
-   - Select the CI pipeline
-   - Click **Run pipeline**
-   - This will build and push Docker images to ACR
-
-2. **Run the CD Pipeline:**
-   - Manually run it from the Pipelines page
-
-
----
-
-## Post-Deployment Configuration
-
-After the AKS cluster is created, additional configuration is required for the CD pipeline to work properly.
-
-### 1. Disable Authorized IP Ranges (if enabled)
-
-If the AKS cluster has authorized IP ranges enabled, the CD pipeline service principal won't be able to connect. Disable it:
-
-```bash
-az aks update \
-  --resource-group <resource-group-name> \
-  --name <aks-cluster-name> \
-  --api-server-authorized-ip-ranges ""
-```
-
-Example:
-```bash
-az aks update \
-  --resource-group rg-demoguppy53 \
-  --name aks-demoguppy53 \
-  --api-server-authorized-ip-ranges ""
-```
-
-### 2. Create Role Assignment for CD Pipeline
-
-The CD pipeline service principal needs Contributor access to the AKS cluster:
-
-```bash
-az role assignment create \
-  --assignee <service-principal-object-id> \
-  --role "Contributor" \
-  --scope /subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.ContainerService/managedClusters/<aks-cluster-name>
-```
-
-Example:
-```bash
-az role assignment create \
-  --assignee 287399e2-6e00-4269-a0ee-1462f484b37e \
-  --role "Contributor" \
-  --scope /subscriptions/34f3d6fb-aee3-4f71-a39e-35b2914052a0/resourceGroups/rg-demoguppy53/providers/Microsoft.ContainerService/managedClusters/aks-demoguppy53
-```
-
-### 3. Create ClusterRoleBinding for Kubernetes RBAC
-
-The CD pipeline service principal needs cluster-admin rights to deploy resources and access secrets:
-
-```bash
-kubectl create clusterrolebinding azure-devops-admin-binding \
-  --clusterrole=cluster-admin \
-  --user=<service-principal-object-id>
-```
-
-Example:
-```bash
-kubectl create clusterrolebinding azure-devops-admin-binding \
-  --clusterrole=cluster-admin \
-  --user=287399e2-6e00-4269-a0ee-1462f484b37e
-```
-
-> **Note:** Replace `<service-principal-object-id>` with the Object ID of the service principal used by your Azure DevOps service connection. You can find this in the Azure Portal under **Azure Active Directory > Enterprise applications**.
-
 ---
 
 ## Project Structure
@@ -309,17 +280,36 @@ kubectl create clusterrolebinding azure-devops-admin-binding \
 ```
 aks-store-demo-solution/
 ├── azure-pipelines/
-│   ├── azure-pipelines-ci.yml    # CI pipeline definition
-│   └── azure-pipelines-cd.yml    # CD pipeline definition
+│   ├── azure-pipelines-ci-images.yml  # CI pipeline for building images
+│   ├── azure-pipelines-ci-helm.yml     # CI pipeline for packaging Helm
+│   └── azure-pipelines-cd.yml          # CD pipeline for deployment
 ├── docker/
-│   └── docker-compose.yml        # Local development setup
+│   └── docker-compose.yml              # Local development setup
 ├── kubernetes/
-│   └── helm-chart/               # Helm chart for deployment
-│       ├── Chart.yaml            # Chart metadata & dependencies
-│       ├── values.yaml           # Default values
-│       └── templates/            # Kubernetes templates
+│   └── helm-chart/                     # Helm chart for deployment
+│       ├── Chart.yaml                  # Chart metadata
+│       ├── values.yaml                  # Default values
+│       └── templates/                  # Kubernetes templates
+│           ├── store-front-deployment.yaml
+│           ├── store-front-service.yaml
+│           ├── order-service-deployment.yaml
+│           ├── order-service-service.yaml
+│           ├── product-service-deployment.yaml
+│           ├── product-service-service.yaml
+│           ├── rabbitmq.yaml
+│           ├── ingress.yaml
+│           └── networkpolicy.yaml
 ├── terraform/
-│   └── main.tf                   # Infrastructure as code
-└── README.md                     # This file
+│   └── main.tf                         # Infrastructure as code
+└── README.md                           # This file
 ```
 
+---
+
+## Features Deployed
+
+- **Resource Limits** - CPU and memory limits for all containers
+- **Network Policies** - Inter-service security policies
+- **Health Probes** - Startup, readiness, and liveness probes
+- **NGINX Ingress Controller** - External access via Load Balancer
+- **RabbitMQ** - Message queue for order processing

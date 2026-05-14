@@ -14,13 +14,6 @@ global:
   imagePullSecrets: []
 
 # -----------------------------------------------------------------------------
-# NGINX Ingress Controller
-# Note: Disabled because it's installed separately via AKS extension
-# -----------------------------------------------------------------------------
-ingress-nginx:
-  enabled: false
-
-# -----------------------------------------------------------------------------
 # Network Policies
 # -----------------------------------------------------------------------------
 networkPolicy:
