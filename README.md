@@ -85,31 +85,67 @@ The infrastructure (AKS cluster, ACR, Resource Group) can be created using Terra
 
 ## Running Locally with Docker Compose
 
-### Quick Start
+The Docker Compose setup pulls images from your Azure Container Registry (ACR). This allows you to test the same images that are deployed to AKS.
 
-1. **Navigate to the docker directory:**
+### Prerequisites
+
+- Docker images must be built and pushed to ACR (run the CI pipeline first)
+- Azure CLI installed and authenticated
+
+### Steps to Run
+
+1. **Login to Azure Container Registry:**
+   ```bash
+   az acr login --name <acr-name>
+   ```
+   Example:
+   ```bash
+   az acr login --name acrdemozebra95
+   ```
+
+2. **Set environment variables:**
+   ```bash
+   export ACR_REGISTRY=<acr-name>.azurecr.io
+   export IMAGE_TAG=latest
+   ```
+   Example:
+   ```bash
+   export ACR_REGISTRY=acrdemozebra95.azurecr.io
+   export IMAGE_TAG=latest
+   ```
+
+3. **Navigate to the docker directory:**
    ```bash
    cd docker
    ```
 
-2. **Start all services:**
+4. **Start all services:**
    ```bash
    docker-compose up -d
    ```
 
-3. **Verify services are running:**
+5. **Verify services are running:**
    ```bash
    docker-compose ps
    ```
 
-4. **Access the application:**
+6. **Access the application:**
    - **Store Front:** http://localhost:8080
    - **RabbitMQ Management:** http://localhost:15672 (username: `username`, password: `password`)
 
-5. **Stop all services:**
+7. **Stop all services:**
    ```bash
    docker-compose down
    ```
+
+### Troubleshooting
+
+If you get an authentication error, ensure you're logged in to ACR:
+```bash
+az acr login --name <acr-name>
+```
+
+If images are not found, ensure the CI pipeline has completed and pushed images to ACR.
 
 ---
 

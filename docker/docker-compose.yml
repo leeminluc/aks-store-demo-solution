@@ -1,9 +1,17 @@
 version: '3.8'
 
+# Local Development Docker Compose
+# Usage:
+#   1. Login to ACR: az acr login --name <acr-name>
+#   2. Set environment variables:
+#      export ACR_REGISTRY=<acr-name>.azurecr.io
+#      export IMAGE_TAG=latest
+#   3. Run: docker-compose up -d
+
 services:
   # Frontend Services
   store-front:
-    image: ghcr.io/azure-samples/aks-store-demo/store-front:2.0.0
+    image: ${ACR_REGISTRY}/store-front:${IMAGE_TAG:-latest}
     ports:
       - "8080:8080"
     environment:
@@ -17,7 +25,7 @@ services:
 
   # Backend Services
   order-service:
-    image: ghcr.io/azure-samples/aks-store-demo/order-service:2.0.0
+    image: ${ACR_REGISTRY}/order-service:${IMAGE_TAG:-latest}
     ports:
       - "3000:3000"
     environment:
@@ -33,7 +41,7 @@ services:
       - store-network
 
   product-service:
-    image: ghcr.io/azure-samples/aks-store-demo/product-service:2.0.0
+    image: ${ACR_REGISTRY}/product-service:${IMAGE_TAG:-latest}
     ports:
       - "3002:3002"
     networks:
