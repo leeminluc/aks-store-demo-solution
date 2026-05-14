@@ -86,48 +86,8 @@ spec:
         - protocol: TCP
           port: 3000
 ---
-# Store Admin Network Policy
-# Allows ingress from ingress controller, egress to makeline-service and order-service
-apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
-kind: NetworkPolicy
-metadata:
-  name: {{ include "aks-store-demo.fullname" . }}-store-admin
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "aks-store-demo.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      app: store-admin
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              name: ingress-nginx
-      ports:
-        - protocol: TCP
-          port: 8081
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: makeline-service
-      ports:
-        - protocol: TCP
-          port: 3001
-    - to:
-        - podSelector:
-            matchLabels:
-              app: order-service
-      ports:
-        - protocol: TCP
-          port: 3000
----
 # Order Service Network Policy
-# Allows ingress from store-front and virtual-customer, egress to rabbitmq
+# Allows ingress from store-front, egress to rabbitmq
 apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
 kind: NetworkPolicy
 metadata:
@@ -147,9 +107,6 @@ spec:
         - podSelector:
             matchLabels:
               app: store-front
-        - podSelector:
-            matchLabels:
-              app: virtual-customer
       ports:
         - protocol: TCP
           port: 3000
@@ -163,7 +120,7 @@ spec:
           port: 5672
 ---
 # Product Service Network Policy
-# Allows ingress from store-front, egress to ai-service (if enabled)
+# Allows ingress from store-front
 apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
 kind: NetworkPolicy
 metadata:
@@ -187,109 +144,11 @@ spec:
         - protocol: TCP
           port: 3002
   egress:
-    {{- if .Values.aiService.enabled }}
-    - to:
-        - podSelector:
-            matchLabels:
-              app: ai-service
-      ports:
-        - protocol: TCP
-          port: 5001
-    {{- end }}
----
-# Makeline Service Network Policy
-# Allows ingress from store-admin and virtual-worker, egress to rabbitmq and mongodb
-apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
-kind: NetworkPolicy
-metadata:
-  name: {{ include "aks-store-demo.fullname" . }}-makeline-service
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "aks-store-demo.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      app: makeline-service
-  policyTypes:
-    - Ingress
-    - Egress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: store-admin
-        - podSelector:
-            matchLabels:
-              app: virtual-worker
-      ports:
-        - protocol: TCP
-          port: 3001
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: rabbitmq
-      ports:
-        - protocol: TCP
-          port: 5672
-    - to:
-        - podSelector:
-            matchLabels:
-              app: mongodb
-      ports:
-        - protocol: TCP
-          port: 27017
----
-# Virtual Customer Network Policy
-# Allows egress to order-service
-apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
-kind: NetworkPolicy
-metadata:
-  name: {{ include "aks-store-demo.fullname" . }}-virtual-customer
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "aks-store-demo.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      app: virtual-customer
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: order-service
-      ports:
-        - protocol: TCP
-          port: 3000
----
-# Virtual Worker Network Policy
-# Allows egress to makeline-service
-apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
-kind: NetworkPolicy
-metadata:
-  name: {{ include "aks-store-demo.fullname" . }}-virtual-worker
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "aks-store-demo.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      app: virtual-worker
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: makeline-service
-      ports:
-        - protocol: TCP
-          port: 3001
+    # Allow all egress for product-service (no dependencies)
+    - {}
 ---
 # RabbitMQ Network Policy
-# Allows ingress from order-service and makeline-service
+# Allows ingress from order-service
 apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
 kind: NetworkPolicy
 metadata:
@@ -308,36 +167,9 @@ spec:
         - podSelector:
             matchLabels:
               app: order-service
-        - podSelector:
-            matchLabels:
-              app: makeline-service
       ports:
         - protocol: TCP
           port: 5672
         - protocol: TCP
           port: 15672
----
-# MongoDB Network Policy
-# Allows ingress from makeline-service
-apiVersion: {{ include "aks-store-demo.networkPolicy.apiVersion" . }}
-kind: NetworkPolicy
-metadata:
-  name: {{ include "aks-store-demo.fullname" . }}-mongodb
-  namespace: {{ .Values.global.namespace }}
-  labels:
-    {{- include "aks-store-demo.labels" . | nindent 4 }}
-spec:
-  podSelector:
-    matchLabels:
-      app: mongodb
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: makeline-service
-      ports:
-        - protocol: TCP
-          port: 27017
 {{- end }}
