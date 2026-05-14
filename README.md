@@ -163,7 +163,7 @@ az aks update \
 **4.2 Get the Service Principal Object ID:**
 
 ```bash
-az ad sp list --query "[?contains(displayName, 'aks-store-demo')].id" -o tsv
+az ad sp list --query "[?contains(displayName, '<your Azure DevOps project name>')].id" -o tsv
 ```
 
 This will return the Object ID of the service principal created by Azure DevOps.
