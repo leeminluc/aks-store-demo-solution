@@ -22,6 +22,7 @@ This repository contains the CI/CD pipelines and infrastructure code for deployi
 | Azure DevOps Project | Create a new project for this solution |
 | Terraform | >= 1.0 (for infrastructure setup) |
 | Azure CLI | Authenticated with `az login` |
+| kubectl | For interacting with the AKS cluster |
 
 ### For Running Locally
 
