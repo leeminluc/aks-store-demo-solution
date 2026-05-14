@@ -49,7 +49,7 @@ services:
 
   # Message Queue
   rabbitmq:
-    image: mcr.microsoft.com/azurelinux/base/rabbitmq-server:3.13
+    image: rabbitmq:3.13-management
     ports:
       - "5672:5672"
       - "15672:15672"
