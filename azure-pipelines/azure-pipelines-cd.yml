@@ -14,7 +14,7 @@ resources:
 variables:
   - group: aks-store-demo-variables
   - name: imageTag
-    value: '$(resources.pipeline.ci-helm.runID)'
+    value: 'latest'
   - name: azureSubscription
     value: 'azure-connection'
   - name: kubernetesNamespace
