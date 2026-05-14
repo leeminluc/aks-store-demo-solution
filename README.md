@@ -162,7 +162,11 @@ az aks update \
 
 **4.2 Get the Service Principal Object ID:**
 
-Go to **Azure Portal > Azure Active Directory > Enterprise applications** and search for the service principal name (same as your Azure DevOps project name). Copy the Object ID.
+```bash
+az ad sp list --query "[?contains(displayName, 'aks-store-demo')].id" -o tsv
+```
+
+This will return the Object ID of the service principal created by Azure DevOps.
 
 **4.3 Create Role Assignment:**
 ```bash
