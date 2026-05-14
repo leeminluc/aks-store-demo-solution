@@ -20,6 +20,7 @@ This repository contains the CI/CD pipelines and infrastructure code for deployi
 | Azure Subscription | With Owner or Contributor access |
 | Azure DevOps Organization | Create at [dev.azure.com](https://dev.azure.com) |
 | Azure DevOps Project | Create a new project for this solution |
+| Fork of this repository | Fork this repo to your GitHub |
 | Terraform | >= 1.0 (for infrastructure setup) |
 | Azure CLI | Authenticated with `az login` |
 | kubectl | For interacting with the AKS cluster |
@@ -124,29 +125,26 @@ Navigate to **Pipelines > Library** and create a variable group named `aks-store
 #### 3.1 Import CI Pipeline (Build Images)
 
 1. Go to **Pipelines > Create Pipeline**
-2. Select **Azure Repos Git** (or your Git provider)
-3. Select your repository
-4. Select **Existing Azure Pipelines YAML file**
-5. Select the path: `/azure-pipelines/azure-pipelines-ci-images.yml`
-6. Save the pipeline as `aks-store-demo-ci-images`
+2. Select **GitHub** (select your forked repository)
+3. Select **Existing Azure Pipelines YAML file**
+4. Select the path: `/azure-pipelines/azure-pipelines-ci-images.yml`
+5. Save the pipeline as `aks-store-demo-ci-images`
 
 #### 3.2 Import CI Pipeline (Package Helm)
 
 1. Go to **Pipelines > Create Pipeline**
-2. Select **Azure Repos Git** (or your Git provider)
-3. Select your repository
-4. Select **Existing Azure Pipelines YAML file**
-5. Select the path: `/azure-pipelines/azure-pipelines-ci-helm.yml`
-6. Save the pipeline as `aks-store-demo-ci-helm`
+2. Select **GitHub** (select your forked repository)
+3. Select **Existing Azure Pipelines YAML file**
+4. Select the path: `/azure-pipelines/azure-pipelines-ci-helm.yml`
+5. Save the pipeline as `aks-store-demo-ci-helm`
 
 #### 3.3 Import CD Pipeline
 
 1. Go to **Pipelines > Create Pipeline**
-2. Select **Azure Repos Git** (or your Git provider)
-3. Select your repository
-4. Select **Existing Azure Pipelines YAML file**
-5. Select the path: `/azure-pipelines/azure-pipelines-cd.yml`
-6. Save the pipeline as `aks-store-demo-cd`
+2. Select **GitHub** (select your forked repository)
+3. Select **Existing Azure Pipelines YAML file**
+4. Select the path: `/azure-pipelines/azure-pipelines-cd.yml`
+5. Save the pipeline as `aks-store-demo-cd`
 
 ---
 
