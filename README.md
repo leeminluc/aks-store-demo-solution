@@ -221,6 +221,12 @@ Run the pipelines in this order:
 2. **Access the application:**
    Open a browser and navigate to `http://<EXTERNAL-IP>`
 
+3. **Access RabbitMQ Management UI (optional):**
+   ```bash
+   kubectl port-forward svc/rabbitmq -n store-demo 15672:15672
+   ```
+   Then open http://localhost:15672 (username: `username`, password: `password`)
+
 ---
 
 ## Run Locally with Docker Compose
