@@ -5,16 +5,16 @@ trigger:
 
 resources:
   pipelines:
-    - pipeline: ci-pipeline
-      source: 'aks-store-demo-ci'
+    - pipeline: ci-helm
+      source: 'aks-store-demo-ci-helm'
       trigger:
         stages:
-          - Build
+          - PublishHelm
 
 variables:
   - group: aks-store-demo-variables
   - name: imageTag
-    value: '$(resources.pipeline.ci-pipeline.runID)'
+    value: '$(resources.pipeline.ci-helm.runID)'
   - name: azureSubscription
     value: 'azure-connection'
   - name: kubernetesNamespace
@@ -41,7 +41,7 @@ stages:
                 - checkout: self
                   displayName: 'Checkout solution repository'
 
-                - download: ci-pipeline
+                - download: ci-helm
                   artifact: helm-chart
                   patterns: '**/*'
 

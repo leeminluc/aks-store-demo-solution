@@ -1,7 +1,20 @@
 # AKS Store Demo - CI Pipeline for Docker Images
 
-trigger: none
-pr: none
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - azure-pipelines/azure-pipelines-ci-images.yml
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - azure-pipelines/azure-pipelines-ci-images.yml
 
 resources:
   repositories:
