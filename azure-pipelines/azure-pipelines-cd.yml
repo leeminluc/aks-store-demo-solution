@@ -88,7 +88,7 @@ stages:
                       ingress.enabled=true
                       ingress.className=nginx
                       networkPolicy.enabled=true
-                    arguments: '--timeout 5m --wait'
+                    arguments: '--timeout 5m --wait --create-namespace'
 
   # Verify Deployment
   - stage: Verify
