@@ -187,6 +187,8 @@ kubectl create clusterrolebinding azure-devops-admin-binding \
 
 ### Step 5: Run the Pipelines
 
+> **Note:** When running a pipeline for the first time, Azure DevOps will prompt for permission to access service connections and variable groups. Click **Permit** to authorize access.
+
 Run the pipelines in this order:
 
 **5.1 Run CI Pipeline (Build Images):**
