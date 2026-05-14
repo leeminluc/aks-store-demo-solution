@@ -25,8 +25,61 @@ variables:
     value: 'ubuntu-latest'
 
 stages:
+  # Install NGINX Ingress Controller
+  - stage: InstallIngress
+    displayName: Install NGINX Ingress Controller
+    jobs:
+      - deployment: InstallIngress
+        displayName: Install NGINX Ingress Controller
+        environment: 'aks-store-demo'
+        pool:
+          vmImage: $(vmImageName)
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Install kubelogin for Azure AD-enabled AKS clusters
+                - script: |
+                    curl -LO "https://github.com/Azure/kubelogin/releases/download/v0.0.26/kubelogin-linux-amd64.zip"
+                    unzip kubelogin-linux-amd64.zip
+                    sudo mv bin/linux_amd64/kubelogin /usr/local/bin/
+                    rm -rf kubelogin-linux-amd64.zip bin
+                    kubelogin --version
+                  displayName: 'Install kubelogin'
+
+                # Install Helm
+                - task: HelmInstaller@1
+                  displayName: 'Install Helm'
+                  inputs:
+                    helmVersionToInstall: '3.13.0'
+
+                # Add NGINX Ingress Helm repo and install
+                - script: |
+                    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+                    helm repo update
+                  displayName: 'Add NGINX Ingress Helm repo'
+
+                # Install NGINX Ingress Controller (idempotent - will skip if already installed)
+                - task: HelmDeploy@0
+                  displayName: 'Install NGINX Ingress Controller'
+                  inputs:
+                    connectionType: 'Azure Resource Manager'
+                    azureSubscription: $(azureSubscription)
+                    azureResourceGroup: $(resourceGroup)
+                    kubernetesCluster: $(aksCluster)
+                    namespace: 'ingress-nginx'
+                    command: 'upgrade'
+                    chartType: 'Name'
+                    chartName: 'ingress-nginx/ingress-nginx'
+                    releaseName: 'ingress-nginx'
+                    install: true
+                    overrideValues: |
+                      controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz
+                    arguments: '--timeout 5m --wait --create-namespace'
+
   # Deploy to AKS using Helm
   - stage: Deploy
+    dependsOn: InstallIngress
     displayName: Deploy to AKS
     jobs:
       - deployment: Deploy
