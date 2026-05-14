@@ -53,7 +53,7 @@ stages:
 
                 # Update Helm dependencies
                 - script: |
-                    cd $(Pipeline.Workspace)/helm-chart
+                    cd $(Pipeline.Workspace)/ci-helm/helm-chart
                     helm dependency update
                   displayName: 'Update Helm dependencies'
 
@@ -68,11 +68,11 @@ stages:
                     namespace: $(kubernetesNamespace)
                     command: 'upgrade'
                     chartType: 'FilePath'
-                    chartPath: '$(Pipeline.Workspace)/helm-chart'
+                    chartPath: '$(Pipeline.Workspace)/ci-helm/helm-chart'
                     releaseName: $(helmReleaseName)
                     install: true
                     force: true
-                    valueFile: '$(Pipeline.Workspace)/helm-chart/values.yaml'
+                    valueFile: '$(Pipeline.Workspace)/ci-helm/helm-chart/values.yaml'
                     overrideValues: |
                       global.imageRegistry=$(containerRegistry)
                       global.imageTag=$(imageTag)
