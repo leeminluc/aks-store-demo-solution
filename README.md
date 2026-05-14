@@ -102,10 +102,9 @@ Navigate to **Project Settings > Service connections** and create the following:
 | Field | Value |
 |-------|-------|
 | Connection type | Azure Resource Manager |
-| Connection name | `azure-connection` |
-| Authentication method | Service principal (automatic) |
 | Scope level | Subscription |
 | Subscription | Your subscription |
+| Connection name | `azure-connection` |
 
 #### 2.2 Create Variable Group
 
