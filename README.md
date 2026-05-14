@@ -195,7 +195,7 @@ Run the pipelines in this order:
 1. Go to Pipelines
 2. Select `aks-store-demo-ci-images`
 3. Click **Run pipeline**
-4. This builds and pushes Docker images to ACR
+4. This builds and pushes Docker images to ACR (approx. 10 min as product-service takes time to build)
 
 **5.2 Run CI Pipeline (Package Helm):**
 1. Go to Pipelines
