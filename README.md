@@ -111,7 +111,7 @@ Navigate to **Project Settings > Service connections** and create the following:
 
 Navigate to **Pipelines > Library** and create a variable group named `aks-store-demo-variables`:
 
-| Variable Name | Example Value | Description |
+| Variable Name | EXAMPLE | Description |
 |---------------|---------------|-------------|
 | `containerRegistryName` | `acrdemoguppy53` | ACR name (without .azurecr.io) |
 | `containerRegistry` | `acrdemoguppy53.azurecr.io` | Full ACR login server URL |
