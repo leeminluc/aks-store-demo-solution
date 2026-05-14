@@ -1,0 +1,89 @@
+{{- if .Values.rabbitmq.enabled }}
+# =============================================================================
+# RabbitMQ - Message Queue
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aks-store-demo.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "aks-store-demo.selectorLabels" . | nindent 6 }}
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        {{- include "aks-store-demo.selectorLabels" . | nindent 8 }}
+        app: rabbitmq
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: rabbitmq
+          image: "rabbitmq:3.13-management"
+          ports:
+            - name: amqp
+              containerPort: 5672
+              protocol: TCP
+            - name: management
+              containerPort: 15672
+              protocol: TCP
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: {{ .Values.rabbitmq.auth.username | quote }}
+            - name: RABBITMQ_DEFAULT_PASS
+              value: {{ .Values.rabbitmq.auth.password | quote }}
+          resources:
+            requests:
+              cpu: {{ .Values.rabbitmq.resources.requests.cpu }}
+              memory: {{ .Values.rabbitmq.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.rabbitmq.resources.limits.cpu }}
+              memory: {{ .Values.rabbitmq.resources.limits.memory }}
+          livenessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - check_running
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - rabbitmq-diagnostics
+                - check_running
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 10
+      nodeSelector:
+        "kubernetes.io/os": linux
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aks-store-demo.labels" . | nindent 4 }}
+    app: rabbitmq
+spec:
+  type: ClusterIP
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: amqp
+      protocol: TCP
+    - name: management
+      port: 15672
+      targetPort: management
+      protocol: TCP
+  selector:
+    app: rabbitmq
+{{- end }}

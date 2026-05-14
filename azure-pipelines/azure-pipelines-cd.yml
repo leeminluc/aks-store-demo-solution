@@ -60,12 +60,6 @@ stages:
                   inputs:
                     helmVersionToInstall: '3.13.0'
 
-                # Update Helm dependencies
-                - script: |
-                    cd $(Pipeline.Workspace)/ci-helm/helm-chart
-                    helm dependency update
-                  displayName: 'Update Helm dependencies'
-
                 # Deploy using Helm
                 - task: HelmDeploy@0
                   displayName: 'Deploy application with Helm'

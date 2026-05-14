@@ -15,17 +15,10 @@ global:
 
 # -----------------------------------------------------------------------------
 # NGINX Ingress Controller
+# Note: Disabled because it's installed separately via AKS extension
 # -----------------------------------------------------------------------------
 ingress-nginx:
-  enabled: true
-  controller:
-    service:
-      type: LoadBalancer
-    config:
-      proxy-body-size: "10m"
-      proxy-connect-timeout: "60"
-      proxy-send-timeout: "60"
-      proxy-read-timeout: "60"
+  enabled: false
 
 # -----------------------------------------------------------------------------
 # Network Policies
