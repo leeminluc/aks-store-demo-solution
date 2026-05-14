@@ -45,43 +45,6 @@ stages:
                   artifact: helm-chart
                   patterns: '**/*'
 
-                # Add agent IP to AKS authorized IP ranges
-                - task: AzureCLI@2
-                  displayName: 'Add Agent IP to AKS Authorized IPs'
-                  inputs:
-                    azureSubscription: $(azureSubscription)
-                    scriptType: 'bash'
-                    scriptLocation: 'inlineScript'
-                    inlineScript: |
-                      # Get current agent IP
-                      AGENT_IP=$(curl -s https://api.ipify.org)
-                      echo "Agent IP: $AGENT_IP"
-                      
-                      # Get current authorized IP ranges
-                      CURRENT_IPS=$(az aks show --resource-group $(resourceGroup) --name $(aksCluster) --query "apiServerAccessProfile.authorizedIpRanges" -o tsv | tr '\n' ',' | sed 's/,$//')
-                      echo "Current authorized IPs: $CURRENT_IPS"
-                      
-                      # Add agent IP if not already present
-                      if [ -z "$CURRENT_IPS" ] || [ "$CURRENT_IPS" == "null" ]; then
-                        NEW_IPS="$AGENT_IP/32"
-                      else
-                        if [[ "$CURRENT_IPS" == *"$AGENT_IP"* ]]; then
-                          echo "Agent IP already in authorized list"
-                          NEW_IPS="$CURRENT_IPS"
-                        else
-                          NEW_IPS="$CURRENT_IPS,$AGENT_IP/32"
-                        fi
-                      fi
-                      
-                      echo "Updating authorized IPs to: $NEW_IPS"
-                      az aks update --resource-group $(resourceGroup) --name $(aksCluster) --api-server-authorized-ip-ranges "$NEW_IPS"
-                      
-                      # Wait for update to propagate
-                      echo "Waiting 60 seconds for IP update to propagate..."
-                      sleep 60
-                      
-                      echo "Agent IP added successfully"
-
                 # Install kubelogin for Azure AD-enabled AKS clusters
                 - script: |
                     curl -LO "https://github.com/Azure/kubelogin/releases/download/v0.0.26/kubelogin-linux-amd64.zip"
@@ -137,43 +100,6 @@ stages:
         pool:
           vmImage: $(vmImageName)
         steps:
-          # Add agent IP to AKS authorized IP ranges
-          - task: AzureCLI@2
-            displayName: 'Add Agent IP to AKS Authorized IPs'
-            inputs:
-              azureSubscription: $(azureSubscription)
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                # Get current agent IP
-                AGENT_IP=$(curl -s https://api.ipify.org)
-                echo "Agent IP: $AGENT_IP"
-                
-                # Get current authorized IP ranges (convert newlines to commas)
-                CURRENT_IPS=$(az aks show --resource-group $(resourceGroup) --name $(aksCluster) --query "apiServerAccessProfile.authorizedIpRanges" -o tsv | tr '\n' ',' | sed 's/,$//')
-                echo "Current authorized IPs: $CURRENT_IPS"
-                
-                # Add agent IP if not already present
-                if [ -z "$CURRENT_IPS" ] || [ "$CURRENT_IPS" == "null" ]; then
-                  NEW_IPS="$AGENT_IP/32"
-                else
-                  if [[ "$CURRENT_IPS" == *"$AGENT_IP"* ]]; then
-                    echo "Agent IP already in authorized list"
-                    NEW_IPS="$CURRENT_IPS"
-                  else
-                    NEW_IPS="$CURRENT_IPS,$AGENT_IP/32"
-                  fi
-                fi
-                
-                echo "Updating authorized IPs to: $NEW_IPS"
-                az aks update --resource-group $(resourceGroup) --name $(aksCluster) --api-server-authorized-ip-ranges "$NEW_IPS"
-                
-                # Wait for update to propagate
-                echo "Waiting 60 seconds for IP update to propagate..."
-                sleep 60
-                
-                echo "Agent IP added successfully"
-
           # Install kubelogin for Azure AD-enabled AKS clusters
           - script: |
               curl -LO "https://github.com/Azure/kubelogin/releases/download/v0.0.26/kubelogin-linux-amd64.zip"

@@ -236,46 +236,71 @@ Navigate to **Pipelines > Library** and create a variable group named `aks-store
    - This will build and push Docker images to ACR
 
 2. **Run the CD Pipeline:**
-   - The CD pipeline will trigger automatically after CI completes
-   - Or manually run it from the Pipelines page
+   - Manually run it from the Pipelines page
+
 
 ---
 
-## Pipeline Overview
+## Post-Deployment Configuration
 
-### CI Pipeline (`azure-pipelines-ci.yml`)
+After the AKS cluster is created, additional configuration is required for the CD pipeline to work properly.
 
-The CI pipeline follows the **Test → Push** pattern:
+### 1. Disable Authorized IP Ranges (if enabled)
 
-1. **Test Stage** - Builds and tests images:
-   - Fetches source code from `Azure-Samples/aks-store-demo` GitHub repository
-   - Builds Docker images using Docker Compose
-   - Runs health check tests on all services:
-     - store-front: http://localhost:8080/health
-     - order-service: http://localhost:3000/health
-     - product-service: http://localhost:3002/health
-   - Stops services after tests pass
+If the AKS cluster has authorized IP ranges enabled, the CD pipeline service principal won't be able to connect. Disable it:
 
-2. **Push Stage** - Builds and pushes to ACR (only if tests pass):
-   - Builds Docker images for 3 microservices:
-     - store-front
-     - order-service
-     - product-service
-   - Pushes images to Azure Container Registry
-   - Publishes Helm chart as artifacts for the CD pipeline
+```bash
+az aks update \
+  --resource-group <resource-group-name> \
+  --name <aks-cluster-name> \
+  --api-server-authorized-ip-ranges ""
+```
 
-### CD Pipeline (`azure-pipelines-cd.yml`)
+Example:
+```bash
+az aks update \
+  --resource-group rg-demoguppy53 \
+  --name aks-demoguppy53 \
+  --api-server-authorized-ip-ranges ""
+```
 
-The CD pipeline performs the following:
+### 2. Create Role Assignment for CD Pipeline
 
-1. **Downloads Helm chart** from the CI pipeline artifacts
-2. **Updates Helm dependencies** (includes NGINX Ingress Controller)
-3. **Deploys to AKS** using HelmDeploy task with:
-   - Resource limits for all containers
-   - Network policies for inter-service security
-   - Security contexts (runAsNonRoot)
-   - Health probes (startup, readiness, liveness)
-4. **Verifies deployment** health
+The CD pipeline service principal needs Contributor access to the AKS cluster:
+
+```bash
+az role assignment create \
+  --assignee <service-principal-object-id> \
+  --role "Contributor" \
+  --scope /subscriptions/<subscription-id>/resourceGroups/<resource-group-name>/providers/Microsoft.ContainerService/managedClusters/<aks-cluster-name>
+```
+
+Example:
+```bash
+az role assignment create \
+  --assignee 287399e2-6e00-4269-a0ee-1462f484b37e \
+  --role "Contributor" \
+  --scope /subscriptions/34f3d6fb-aee3-4f71-a39e-35b2914052a0/resourceGroups/rg-demoguppy53/providers/Microsoft.ContainerService/managedClusters/aks-demoguppy53
+```
+
+### 3. Create ClusterRoleBinding for Kubernetes RBAC
+
+The CD pipeline service principal needs cluster-admin rights to deploy resources and access secrets:
+
+```bash
+kubectl create clusterrolebinding azure-devops-admin-binding \
+  --clusterrole=cluster-admin \
+  --user=<service-principal-object-id>
+```
+
+Example:
+```bash
+kubectl create clusterrolebinding azure-devops-admin-binding \
+  --clusterrole=cluster-admin \
+  --user=287399e2-6e00-4269-a0ee-1462f484b37e
+```
+
+> **Note:** Replace `<service-principal-object-id>` with the Object ID of the service principal used by your Azure DevOps service connection. You can find this in the Azure Portal under **Azure Active Directory > Enterprise applications**.
 
 ---
 
