@@ -91,10 +91,11 @@ Navigate to **Project Settings > Service connections** and create the following:
 | Field | Value |
 |-------|-------|
 | Connection type | Docker Registry |
-| Connection name | `acr-connection` |
 | Registry type | Azure Container Registry |
+| Authentication type | Service Principal |
 | Azure subscription | Your subscription |
 | Azure Container Registry | Your ACR instance |
+| Connection name | `acr-connection` |
 
 **Azure Resource Manager Connection:**
 
