@@ -36,24 +36,20 @@ stages:
             displayName: 'Checkout solution repository'
 
           - script: |
-              echo "Packaging Helm chart..."
+              echo "Preparing Helm chart..."
               cd $(Build.SourcesDirectory)/kubernetes/helm-chart
               
               # Download dependencies
               echo "Downloading Helm dependencies..."
               helm dependency update
               
-              # Package the chart
-              mkdir -p ./packaged
-              helm package . -d ./packaged
-              
-              echo "Packaged Helm chart:"
-              ls -la ./packaged
-            displayName: 'Package Helm chart'
+              echo "Helm chart contents:"
+              ls -la
+            displayName: 'Prepare Helm chart'
 
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Helm Chart Artifact'
             inputs:
-              PathtoPublish: '$(Build.SourcesDirectory)/kubernetes/helm-chart/packaged'
+              PathtoPublish: '$(Build.SourcesDirectory)/kubernetes/helm-chart'
               ArtifactName: 'helm-chart'
               publishLocation: 'Container'
