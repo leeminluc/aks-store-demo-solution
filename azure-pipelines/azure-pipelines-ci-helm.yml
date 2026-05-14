@@ -1,0 +1,79 @@
+# AKS Store Demo - CI Pipeline for Helm Chart
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - kubernetes/helm-chart/
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - kubernetes/helm-chart/
+
+variables:
+  - group: aks-store-demo-variables
+  - name: vmImageName
+    value: 'ubuntu-latest'
+  - name: acrConnection
+    value: 'acr-connection'
+  - name: containerRegistry
+    value: '$(containerRegistryName).azurecr.io'
+
+stages:
+  - stage: PublishHelm
+    displayName: Package and Push Helm Chart
+    jobs:
+      - job: Publish
+        displayName: Package and Push Helm Chart
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - checkout: self
+            displayName: 'Checkout solution repository'
+
+          - script: |
+              echo "Current directory: $(pwd)"
+              echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+              echo "Listing contents..."
+              ls -la $(Build.SourcesDirectory)
+              echo "Looking for helm-chart..."
+              find $(Build.SourcesDirectory) -name "helm-chart" -type d 2>/dev/null || echo "Not found"
+            displayName: 'Debug - List directories'
+
+          - script: |
+              echo "Packaging Helm chart..."
+              mkdir -p ./packaged
+              helm package $(Build.SourcesDirectory)/kubernetes/helm-chart -d ./packaged
+              echo "Packaged Helm chart:"
+              ls -la ./packaged
+            displayName: 'Package Helm chart'
+
+          - task: Docker@2
+            displayName: Login to ACR
+            inputs:
+              command: login
+              containerRegistry: $(acrConnection)
+
+          - script: |
+              echo "Pushing Helm chart to ACR..."
+              # Get the packaged chart file
+              CHART_FILE=$(ls ./packaged/*.tgz | head -n1)
+              echo "Chart file: $CHART_FILE"
+              
+              # Push to ACR using helm push (OCI format)
+              helm push $CHART_FILE oci://$(containerRegistry)/helm
+              echo "Helm chart pushed to ACR!"
+            displayName: 'Push Helm chart to ACR'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Helm Chart Artifact'
+            inputs:
+              PathtoPublish: './packaged'
+              ArtifactName: 'helm-chart'
+              publishLocation: 'Container'

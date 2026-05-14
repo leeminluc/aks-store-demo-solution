@@ -1,0 +1,46 @@
+{{- if .Values.orderService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aks-store-demo.labels" . | nindent 4 }}
+    app: order-service
+spec:
+  replicas: {{ .Values.orderService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aks-store-demo.selectorLabels" . | nindent 6 }}
+      app: order-service
+  template:
+    metadata:
+      labels:
+        {{- include "aks-store-demo.selectorLabels" . | nindent 8 }}
+        app: order-service
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: order-service
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.orderService.image.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.orderService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.orderService.service.port }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.orderService.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.orderService.resources | nindent 12 }}
+          startupProbe:
+            {{- toYaml .Values.orderService.probes.startup | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.orderService.probes.readiness | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.orderService.probes.liveness | nindent 12 }}
+      nodeSelector:
+        "kubernetes.io/os": linux
+{{- end }}

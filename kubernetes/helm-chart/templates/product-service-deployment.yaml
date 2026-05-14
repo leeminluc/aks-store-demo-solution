@@ -1,0 +1,44 @@
+{{- if .Values.productService.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "aks-store-demo.labels" . | nindent 4 }}
+    app: product-service
+spec:
+  replicas: {{ .Values.productService.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aks-store-demo.selectorLabels" . | nindent 6 }}
+      app: product-service
+  template:
+    metadata:
+      labels:
+        {{- include "aks-store-demo.selectorLabels" . | nindent 8 }}
+        app: product-service
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: product-service
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.productService.image.repository }}:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.productService.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.productService.service.port }}
+              protocol: TCP
+          env:
+            {{- toYaml .Values.productService.env | nindent 12 }}
+          resources:
+            {{- toYaml .Values.productService.resources | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.productService.probes.readiness | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.productService.probes.liveness | nindent 12 }}
+      nodeSelector:
+        "kubernetes.io/os": linux
+{{- end }}
